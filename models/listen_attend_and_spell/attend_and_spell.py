@@ -112,7 +112,8 @@ class AttendSpellRNN(nn.Module):
         embedded = self.input_dropout(embedded)
 
         if self.training:
-            self.rnn.flatten_parameters()
+            self.bottom_rnn.flatten_parameters()
+            self.upper_rnn.flatten_parameters()
 
         attn = None
         # attn = self.attention(encoder_outputs, last_bottom_hidden)  # (batch, max_len)
