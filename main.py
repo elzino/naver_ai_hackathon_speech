@@ -24,7 +24,8 @@ import Levenshtein as Lev
 
 import label_loader
 from loader import *
-from models.naver_model import EncoderRNN, DecoderRNN, Seq2seq
+from models.naver_model import DecoderRNN, Seq2seq
+from models.listen_attend_and_spell import ListenRNN
 
 import nsml
 from nsml import GPU_NUM, DATASET_PATH, DATASET_NAME, HAS_DATASET
@@ -319,9 +320,9 @@ def main():
     # N_FFT: defined in loader.py
     feature_size = MEL_FILTERS
 
-    enc = EncoderRNN(feature_size, args.hidden_size,
+    enc = ListenRNN(feature_size, args.hidden_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
-                     n_layers=args.layer_size, bidirectional=True, rnn_cell='gru', variable_lengths=False)
+                     n_layers=args.layer_size, bidirectional=True, rnn_cell='gru')
 
     dec = DecoderRNN(len(char2index), args.max_len, args.hidden_size * (2 if True else 1),
                      SOS_token, EOS_token,
