@@ -93,14 +93,14 @@ class AttendSpellRNN(nn.Module):
 
         assert n_layers > 1
 
-        self.bottom_rnn = self.rnn_cell(hidden_size, hidden_size, batch_first=True, dropout=dropout_p)
+        self.bottom_rnn = self.rnn_cell(hidden_size * 2, hidden_size, batch_first=True, dropout=dropout_p)
         self.upper_rnn = self.rnn_cell(hidden_size, hidden_size, n_layers-1, batch_first=True, dropout=dropout_p)
 
         # TODO word embedding dimension parameter 추가하고 바꾸기
         self.embedding = nn.Embedding(vocab_size, hidden_size)
 
         self.input_dropout = nn.Dropout(p=input_dropout_p)
-        # self.attention = Attention(self.hidden_size)
+        self.attention = Attention(self.hidden_size)
         self.out = nn.Linear(self.hidden_size, vocab_size)
 
     def forward_step(self, input_var, last_bottom_hidden, last_upper_hidden, encoder_outputs, function):
@@ -109,20 +109,17 @@ class AttendSpellRNN(nn.Module):
         # encoder_outputs = [B x max_len x hidden_dim]
 
         embedded = self.embedding(input_var)
-        embedded = self.input_dropout(embedded)
+        embedded = self.input_dropout(embedded).unsqueeze(1)  # B x 1 x H
 
         if self.training:
             self.bottom_rnn.flatten_parameters()
             self.upper_rnn.flatten_parameters()
 
-        attn = None
-        # attn = self.attention(encoder_outputs, last_bottom_hidden)  # (batch, max_len)
-        # context = attn.unsqueeze(1).bmm(encoder_outputs).squeeze(1)  # (batch, hidden_dim)
-        # x = torch.cat([embedded, context], 1).unsqueeze(1)  # B x 1 x H
+        attn = self.attention(encoder_outputs, last_bottom_hidden)  # (batch, max_len)
+        context = attn.unsqueeze(1).bmm(encoder_outputs)  # B x 1 x H
+        x = torch.cat([embedded, context], 2)  # B x 1 x (2 * H)
 
-        embedded = embedded.unsqueeze(1)  # B x 1 x H   - attention 구현되면 지워야함
-
-        x, bottom_hidden = self.bottom_rnn(embedded, last_bottom_hidden)
+        x, bottom_hidden = self.bottom_rnn(x, last_bottom_hidden)
         x, upper_hidden = self.upper_rnn(x, last_upper_hidden)  # B x 1 x H
         predicted_prob = function(self.out(x.squeeze(1)), dim=-1)  # B x vocab_size
 
@@ -185,7 +182,11 @@ class AttendSpellRNN(nn.Module):
             encoder_hidden = tuple([self._cat_directions(h) for h in encoder_hidden])
         else:
             encoder_hidden = self._cat_directions(encoder_hidden)
-        return encoder_hidden[0, :, :].unsqueeze(0), encoder_hidden[1:, :, :]
+        sizes = encoder_hidden.size()
+        bottom_hidden = torch.cat([encoder_hidden[0, :, :].unsqueeze(0),
+                                   torch.zeros(1, sizes[1], sizes[2]).to(self.device)], 2)
+        upper_hidden = encoder_hidden[1:, :, :]
+        return bottom_hidden, upper_hidden
 
     def _init_state_zero(self, batch_size):
         bottom_init = torch.zeros(1, batch_size, self.hidden_size).to(self.device)

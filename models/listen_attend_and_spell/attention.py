@@ -12,7 +12,7 @@ class Attention(nn.Module):
     def __init__(self, hidden_dim):
         """
         Args
-            hidden_dim: dimension of hidden unit in LSTM
+            hidden_dim: dimension of hidden unit in LSTM = numdirections * hidden_size
 
         Inputs
             encoder_outputs: (seq_len, batch, num_directions * hidden_size)
