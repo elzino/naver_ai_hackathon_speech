@@ -103,7 +103,7 @@ class AttendSpellRNN(nn.Module):
         # self.attention = Attention(self.hidden_size)
         self.out = nn.Linear(self.hidden_size, vocab_size)
 
-    def forward_step(self, input_var, last_bottom_hidden, last_upper_hidden, encoder_outputs):
+    def forward_step(self, input_var, last_bottom_hidden, last_upper_hidden, encoder_outputs, function):
         # input_var = [list of int] = [B]
         # last_~~~_hidden = [layer x B x hidden_size]
         # encoder_outputs = [B x max_len x hidden_dim]
@@ -123,11 +123,11 @@ class AttendSpellRNN(nn.Module):
 
         x, bottom_hidden = self.bottom_rnn(embedded, last_bottom_hidden)
         x, upper_hidden = self.upper_rnn(x, last_upper_hidden)  # B x 1 x H
-        predicted_prob = F.softmax(self.out(x.squeeze(1)), dim=-1)  # B x vocab_size
+        predicted_prob = function(self.out(x.squeeze(1)), dim=-1)  # B x vocab_size
 
         return predicted_prob, bottom_hidden, upper_hidden, attn
 
-    def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None, teacher_forcing_ratio=0):
+    def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None, function=F.log_softmax, teacher_forcing_ratio=0):
         ret_dict = dict()
         ret_dict[AttendSpellRNN.KEY_ATTN_SCORE] = list()
 
@@ -160,13 +160,13 @@ class AttendSpellRNN(nn.Module):
             decoder_input = inputs[:, :-1]
             for di in range(max_length):
                 decoder_output, bottom_hidden, upper_hidden, attn \
-                    = self.forward_step(decoder_input[:, di], bottom_hidden, upper_hidden, encoder_outputs)
+                    = self.forward_step(decoder_input[:, di], bottom_hidden, upper_hidden, encoder_outputs, function)
                 decode(di, decoder_output, attn)
         else:
             decoder_input = inputs[:, 0]
             for di in range(max_length):
                 decoder_output, bottom_hidden, upper_hidden, step_attn \
-                    = self.forward_step(decoder_input, bottom_hidden, upper_hidden, encoder_outputs)
+                    = self.forward_step(decoder_input, bottom_hidden, upper_hidden, encoder_outputs, function)
                 symbols = decode(di, decoder_output, step_attn)  # batch x 1
                 decoder_input = symbols.squeeze(1)
 
