@@ -114,7 +114,7 @@ class BaseDataset(Dataset):
         return len(self.wav_paths)
 
     def getitem(self, idx):
-        feat = get_log_melspectrogram_feature(self.wav_paths[idx])
+        feat = get_augmented_log_melspectrogram(self.wav_paths[idx])
         script = get_script(self.script_paths[idx], self.bos_id, self.eos_id)
         return feat, script
 
