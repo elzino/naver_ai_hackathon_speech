@@ -24,8 +24,7 @@ import Levenshtein as Lev
 
 import label_loader
 from loader import *
-from models.naver_model import DecoderRNN, Seq2seq
-from models.listen_attend_and_spell import ListenRNN
+from models.listen_attend_and_spell import ListenRNN, Seq2seq, AttendSpellRNN
 
 import nsml
 from nsml import GPU_NUM, DATASET_PATH, DATASET_NAME, HAS_DATASET
@@ -324,10 +323,10 @@ def main():
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
                      n_layers=args.layer_size, rnn_cell='gru')
 
-    dec = DecoderRNN(len(char2index), args.max_len, args.hidden_size * (2 if True else 1),
+    dec = AttendSpellRNN(len(char2index), args.max_len, args.hidden_size * 2,
                      SOS_token, EOS_token,
-                     n_layers=args.layer_size, rnn_cell='gru', bidirectional=True,
-                     input_dropout_p=args.dropout, dropout_p=args.dropout, use_attention=args.use_attention)
+                     n_layers=args.layer_size, rnn_cell='gru',
+                     input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=1, device=device)
 
     model = Seq2seq(enc, dec)
     model.flatten_parameters()

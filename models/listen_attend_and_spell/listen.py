@@ -41,7 +41,6 @@ class ListenRNN(nn.Module):
         self.input_dropout_p = input_dropout_p
         self.input_dropout = nn.Dropout(p=input_dropout_p)
         self.dropout_p = dropout_p
-        self.rnn_cell = nn.GRU
 
         if rnn_cell.lower() == 'lstm':
             self.rnn_cell = nn.LSTM
