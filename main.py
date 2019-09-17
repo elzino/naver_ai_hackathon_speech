@@ -16,28 +16,15 @@ limitations under the License.
 
 #-*- coding: utf-8 -*-
 
-import os
-import sys
-import time
-import math
-import wavio
 import argparse
 import queue
-import shutil
-import random
-import math
-import time
-import torch
-import logging
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
-import torch.optim as optim
-import Levenshtein as Lev 
+import Levenshtein as Lev
 
 import label_loader
 from loader import *
-from models import EncoderRNN, DecoderRNN, Seq2seq
+from models.naver_model import EncoderRNN, DecoderRNN, Seq2seq
 
 import nsml
 from nsml import GPU_NUM, DATASET_PATH, DATASET_NAME, HAS_DATASET
@@ -140,7 +127,7 @@ def train(model, total_batch_size, queue, criterion, optimizer, device, train_be
         model.module.flatten_parameters()
         logit = model(feats, feat_lengths, scripts, teacher_forcing_ratio=teacher_forcing_ratio)
 
-        logit = torch.stack(logit, dim=1).to(device)
+        logit = torch.stack(logit, dim=1).to(device)  # batch x seq_len x vocab_size
 
         y_hat = logit.max(-1)[1]
 
@@ -211,7 +198,7 @@ def evaluate(model, dataloader, queue, criterion, device):
             model.module.flatten_parameters()
             logit = model(feats, feat_lengths, scripts, teacher_forcing_ratio=0.0)
 
-            logit = torch.stack(logit, dim=1).to(device)
+            logit = torch.stack(logit, dim=1).to(device)  # batch x seq_len x vocab_size
             y_hat = logit.max(-1)[1]
 
             loss = criterion(logit.contiguous().view(-1, logit.size(-1)), target.contiguous().view(-1))
@@ -257,7 +244,7 @@ def bind_model(model, optimizer=None):
 
         return hyp[0]
 
-    nsml.bind(save=save, load=load, infer=infer) # 'nsml.bind' function must be called at the end.
+    nsml.bind(save=save, load=load, infer=infer)  # 'nsml.bind' function must be called at the end.
 
 def split_dataset(config, wav_paths, script_paths, valid_ratio=0.05):
     train_loader_count = config.workers
@@ -299,10 +286,9 @@ def main():
     global PAD_token
 
     parser = argparse.ArgumentParser(description='Speech hackathon Baseline')
-    parser.add_argument('--hidden_size', type=int, default=512, help='hidden size of model (default: 256)')
+    parser.add_argument('--hidden_size', type=int, default=512, help='hidden size of model (default: 512)')
     parser.add_argument('--layer_size', type=int, default=3, help='number of layers of model (default: 3)')
     parser.add_argument('--dropout', type=float, default=0.2, help='dropout rate in training (default: 0.2)')
-    parser.add_argument('--bidirectional', action='store_true', help='use bidirectional RNN for encoder (default: False)')
     parser.add_argument('--use_attention', action='store_true', help='use attention between encoder-decoder (default: False)')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in training (default: 32)')
     parser.add_argument('--workers', type=int, default=4, help='number of workers in dataset loader (default: 4)')
@@ -335,18 +321,18 @@ def main():
 
     enc = EncoderRNN(feature_size, args.hidden_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
-                     n_layers=args.layer_size, bidirectional=args.bidirectional, rnn_cell='gru', variable_lengths=False)
+                     n_layers=args.layer_size, bidirectional=True, rnn_cell='gru', variable_lengths=False)
 
-    dec = DecoderRNN(len(char2index), args.max_len, args.hidden_size * (2 if args.bidirectional else 1),
+    dec = DecoderRNN(len(char2index), args.max_len, args.hidden_size * (2 if True else 1),
                      SOS_token, EOS_token,
-                     n_layers=args.layer_size, rnn_cell='gru', bidirectional=args.bidirectional,
+                     n_layers=args.layer_size, rnn_cell='gru', bidirectional=True,
                      input_dropout_p=args.dropout, dropout_p=args.dropout, use_attention=args.use_attention)
 
     model = Seq2seq(enc, dec)
     model.flatten_parameters()
 
     for param in model.parameters():
-        param.data.uniform_(-0.08, 0.08)
+        param.data.uniform_(-0.1, 0.1)
 
     model = nn.DataParallel(model).to(device)
 
