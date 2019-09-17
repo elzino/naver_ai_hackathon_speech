@@ -70,12 +70,14 @@ class ListenRNN(nn.Module):
 
         self.rnn = self.rnn_cell(feature_size, hidden_size, n_layers, batch_first=True, bidirectional=True, dropout=dropout_p)
 
-    def forward(self, input_var):
+    def forward(self, input_var, input_lengths=None):
         """
         Applies a multi-layer RNN to an input sequence.
 
         Args:
             input_var (batch, mel_filter, seq_len): tensor containing the features of the input sequence.
+            input_lengths (list of int, optional): A list that contains the lengths of sequences
+              in the mini-batch
 
         Returns: output, hidden
             - **output** (seq_len, batch, num_direction * hidden_size): variable containing the encoded features of the input sequence
