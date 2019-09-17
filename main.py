@@ -322,7 +322,7 @@ def main():
 
     enc = ListenRNN(feature_size, args.hidden_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
-                     n_layers=args.layer_size, bidirectional=True, rnn_cell='gru')
+                     n_layers=args.layer_size, rnn_cell='gru')
 
     dec = DecoderRNN(len(char2index), args.max_len, args.hidden_size * (2 if True else 1),
                      SOS_token, EOS_token,
