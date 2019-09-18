@@ -65,6 +65,7 @@ def get_spectrogram_feature(filepath):
     amag = stft.numpy();
     feat = torch.FloatTensor(amag)
     feat = torch.FloatTensor(feat).transpose(0, 1)
+    feat -= feat.mean()
 
     # T * (N_FFT / 2 + 1)
     return feat
