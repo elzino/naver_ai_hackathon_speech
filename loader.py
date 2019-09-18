@@ -65,27 +65,57 @@ def get_spectrogram_feature(filepath):
     amag = stft.numpy();
     feat = torch.FloatTensor(amag)
     feat = torch.FloatTensor(feat).transpose(0, 1)
+    feat -= feat.mean()
 
     # T * (N_FFT / 2 + 1)
     return feat
 
 
 def get_log_melspectrogram_feature(filepath, n_fft=512, hop_length=128, window='hamming', n_mels=128, fmax=5000):
+    logger.info(1)
     audio, sr = librosa.load(filepath, sr=None)
+    logger.info(2)
     #  fmax 8000일 때 보다 5000 일때 조금 느린 느낌이 있음. 만약 병목현상 발생하면 여기 들여봐야할 듯
     S = librosa.feature.melspectrogram(y=audio, sr=sr, n_fft=n_fft, hop_length=hop_length, window=window, n_mels=n_mels, fmax=fmax)
+    logger.info(3)
     S = librosa.power_to_db(S)
+    logger.info(4)
     feat = torch.FloatTensor(S).transpose(0, 1)  # time * melFilter
+    logger.info(5)
     feat -= feat.mean()  # mean = 0 로 normalize
+    logger.info(6)
+    logger.info(feat.size())
+
+    (rate, width, sig) = wavio.readwav(filepath)
+    sig = sig.ravel()
+
+    stft = torch.stft(torch.FloatTensor(sig),
+                      N_FFT,
+                      hop_length=int(0.01 * SAMPLE_RATE),
+                      win_length=int(0.030 * SAMPLE_RATE),
+                      window=torch.hamming_window(int(0.030 * SAMPLE_RATE)),
+                      center=False,
+                      normalized=False,
+                      onesided=True)
+
+    stft = (stft[:, :, 0].pow(2) + stft[:, :, 1].pow(2)).pow(0.5);
+    amag = stft.numpy();
+    feat = torch.FloatTensor(amag)
+    feat = torch.FloatTensor(feat).transpose(0, 1)
+    feat -= feat.mean()
+
     return feat  # time * melFilter
 
 
 def get_augmented_log_melspectrogram(filepath, n_fft=512, hop_length=128, window='hamming', n_mels=128, fmax=5000,
                                      time_warping_para=80, frequency_masking_para=27, time_masking_para=100,
                                      frequency_mask_num=1, time_mask_num=1):
+    logger.info(filepath)
     mel_spectrogram = get_log_melspectrogram_feature(filepath, n_fft, hop_length, window, n_mels, fmax)
+    logger.info(7)
     augmented_feat = spec_augment(mel_spectrogram, time_warping_para, frequency_masking_para, time_masking_para,
                         frequency_mask_num, time_mask_num)
+    logger.info(8)
     return augmented_feat  # time * mel_filter
 
 
@@ -114,7 +144,7 @@ class BaseDataset(Dataset):
         return len(self.wav_paths)
 
     def getitem(self, idx):
-        feat = get_augmented_log_melspectrogram(self.wav_paths[idx])
+        feat = get_log_melspectrogram_feature(self.wav_paths[idx])
         script = get_script(self.script_paths[idx], self.bos_id, self.eos_id)
         return feat, script
 
@@ -187,6 +217,7 @@ class BaseDataLoader(threading.Thread):
                     break
 
                 items.append(self.dataset.getitem(rand_index[self.index]))
+                logger.info('append')
                 self.index += 1
 
             if len(items) == 0:
@@ -196,7 +227,10 @@ class BaseDataLoader(threading.Thread):
 
 
             batch = self.collate_fn(items)
+            logger.info(10)
+            logger.info(batch)
             self.queue.put(batch)
+            logger.info(11)
         logger.debug('loader %d stop' % (self.thread_id))
 
 class MultiLoader():

@@ -317,7 +317,7 @@ def main():
     device = torch.device('cuda' if args.cuda else 'cpu')
 
     # N_FFT: defined in loader.py
-    feature_size = MEL_FILTERS
+    feature_size = N_FFT / 2 + 1
 
     enc = ListenRNN(feature_size, args.hidden_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
@@ -359,7 +359,7 @@ def main():
             wav_paths.append(os.path.join(DATASET_PATH, 'train_data', wav_path))
             script_paths.append(os.path.join(DATASET_PATH, 'train_data', script_path))
 
-    best_loss = 1e10
+    best_cer = 1e10
     begin_epoch = 0
 
     # load all target scripts for reducing disk i/o
@@ -397,12 +397,12 @@ def main():
             step=epoch, train_epoch__loss=train_loss, train_epoch__cer=train_cer,
             eval__loss=eval_loss, eval__cer=eval_cer)
 
-        best_model = (eval_loss < best_loss)
+        best_model = (eval_cer < best_cer)
         nsml.save(args.save_name)
 
         if best_model:
-            nsml.save('best')
-            best_loss = eval_loss
+            nsml.save('best' + str(best_cer))
+            best_cer = eval_cer
 
 if __name__ == "__main__":
     main()

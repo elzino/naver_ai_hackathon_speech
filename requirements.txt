@@ -1,0 +1,12 @@
+--index-url https://pypi.python.org/simple/
+
+audioread >= 2.1.6
+numpy >= 1.16.2
+scipy >= 1.2.1
+scikit-learn >= 0.20.3
+joblib >= 0.13.2
+decorator >= 4.4.0
+six >= 1.12.0
+resampy >= 0.2.2
+soundfile >= 0.9.0
+librosa==0.7
