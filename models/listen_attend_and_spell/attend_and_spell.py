@@ -68,7 +68,7 @@ class AttendSpellRNN(nn.Module):
     KEY_SEQUENCE = 'sequence'
 
     def __init__(self, vocab_size, max_len, hidden_size, sos_id, eos_id, n_layers=2, rnn_cell='gru',
-                 embedding_size=128, input_dropout_p=0, dropout_p=0, beam_width=1, device='cpu'):
+                 embedding_size=512, input_dropout_p=0, dropout_p=0, beam_width=1, device='cpu'):
         super().__init__()
 
         self.device = device
@@ -111,9 +111,8 @@ class AttendSpellRNN(nn.Module):
         embedded = self.embedding(input_var)
         embedded = self.input_dropout(embedded).unsqueeze(1)  # B x 1 x H
 
-        if self.training:
-            self.bottom_rnn.flatten_parameters()
-            self.upper_rnn.flatten_parameters()
+        self.bottom_rnn.flatten_parameters()
+        self.upper_rnn.flatten_parameters()
 
         attn = self.attention(encoder_outputs, last_bottom_hidden)  # (batch, max_len)
         context = attn.unsqueeze(1).bmm(encoder_outputs)  # B x 1 x H

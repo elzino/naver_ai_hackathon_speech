@@ -40,7 +40,7 @@ logger.setLevel(logging.INFO)
 PAD = 0
 N_FFT = 512
 SAMPLE_RATE = 16000
-MEL_FILTERS = 128
+MEL_FILTERS = 256
 
 target_dict = dict()
 
