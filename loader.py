@@ -204,7 +204,7 @@ class BaseDataLoader(threading.Thread):
         return seqs, targets, seq_lengths, target_lengths
 
     def run(self):
-        logger.debug('loader %d start' % (self.thread_id))
+        logger.info('loader %d start' % (self.thread_id))
         rand_index = np.random.permutation(self.dataset_count)
         while True:
             items = list()
@@ -224,7 +224,7 @@ class BaseDataLoader(threading.Thread):
 
             batch = self.collate_fn(items)
             self.queue.put(batch)
-        logger.debug('loader %d stop' % (self.thread_id))
+        logger.info('loader %d stop' % (self.thread_id))
 
 class MultiLoader():
     def __init__(self, dataset_list, queue, batch_size, worker_size):

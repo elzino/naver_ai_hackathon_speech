@@ -270,8 +270,8 @@ def split_dataset(config, wav_paths, script_paths, valid_ratio=0.05):
         train_dataset_list.append(BaseDataset(
                                         wav_paths[train_begin_raw_id:train_end_raw_id],
                                         script_paths[train_begin_raw_id:train_end_raw_id],
-                                        SOS_token, EOS_token))
-        train_begin = train_end 
+                                        SOS_token, EOS_token, train=True))
+        train_begin = train_end
 
     valid_dataset = BaseDataset(wav_paths[train_end_raw_id:], script_paths[train_end_raw_id:], SOS_token, EOS_token)
 
