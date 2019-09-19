@@ -93,7 +93,7 @@ class AttendSpellRNN(nn.Module):
 
         assert n_layers > 1
 
-        self.bottom_rnn = self.rnn_cell(hidden_size * 2, hidden_size, batch_first=True, dropout=dropout_p)
+        self.bottom_rnn = self.rnn_cell(hidden_size * 2, hidden_size, batch_first=True)
         self.upper_rnn = self.rnn_cell(hidden_size, hidden_size, n_layers-1, batch_first=True, dropout=dropout_p)
 
         # TODO word embedding dimension parameter 추가하고 바꾸기
