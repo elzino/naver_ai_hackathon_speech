@@ -78,6 +78,8 @@ def get_log_melspectrogram_feature(filepath, melspectrogram, amplitude_to_db):
 
     S = melspectrogram(sig)  # C * n_mels * time
     S = amplitude_to_db(S)  # C * nmels * time
+    S = S.detach().numpy()
+    S = torch.FloatTensor(S)
     feat = S.squeeze(0).transpose(0, 1)  # time * nmels
     feat -= feat.mean()
 
@@ -116,7 +118,7 @@ def get_script(filepath, bos_id, eos_id):
 
 class BaseDataset(Dataset):
     def __init__(self, wav_paths, script_paths, bos_id=1307, eos_id=1308,
-                 n_fft=512, hop_length=128, window=torch.hamming_window, n_mels=MEL_FILTERS, fmax=5000,):
+                 n_fft=512, hop_length=128, window=torch.hamming_window, n_mels=MEL_FILTERS, fmax=5000, train=False):
         self.wav_paths = wav_paths
         self.script_paths = script_paths
         self.bos_id, self.eos_id = bos_id, eos_id
@@ -124,6 +126,10 @@ class BaseDataset(Dataset):
                                                                    hop_length=hop_length, window_fn=window,
                                                                    n_mels=n_mels, f_max=fmax)
         self.amplitude_to_DB = torchaudio.transforms.AmplitudeToDB(stype='power', top_db=80)
+        if train:
+            self.get_feature = get_augmented_log_melspectrogram
+        else:
+            self.get_feature = get_log_melspectrogram_feature
 
     def __len__(self):
         return len(self.wav_paths)
@@ -132,9 +138,12 @@ class BaseDataset(Dataset):
         return len(self.wav_paths)
 
     def getitem(self, idx):
-        feat = get_augmented_log_melspectrogram(self.wav_paths[idx], self.melspectrogram, self.amplitude_to_DB)
+        feat = self.get_feature(self.wav_paths[idx], self.melspectrogram, self.amplitude_to_DB)
         script = get_script(self.script_paths[idx], self.bos_id, self.eos_id)
         return feat, script
+
+    def __del__(self):
+        del self.melspectrogram, self.amplitude_to_DB, self.get_feature
 
 def _collate_fn(batch):
     # batch = [(feat, script) * batch_size]

@@ -68,7 +68,7 @@ class AttendSpellRNN(nn.Module):
     KEY_SEQUENCE = 'sequence'
 
     def __init__(self, vocab_size, max_len, hidden_size, sos_id, eos_id, n_layers=2, rnn_cell='gru',
-                 input_dropout_p=0, dropout_p=0, beam_width=1, device='cpu'):
+                 embedding_size=128, input_dropout_p=0, dropout_p=0, beam_width=1, device='cpu'):
         super().__init__()
 
         self.device = device
@@ -93,11 +93,11 @@ class AttendSpellRNN(nn.Module):
 
         assert n_layers > 1
 
-        self.bottom_rnn = self.rnn_cell(hidden_size * 2, hidden_size, batch_first=True)
+        self.bottom_rnn = self.rnn_cell(hidden_size + embedding_size, hidden_size, batch_first=True)
         self.upper_rnn = self.rnn_cell(hidden_size, hidden_size, n_layers-1, batch_first=True, dropout=dropout_p)
 
         # TODO word embedding dimension parameter 추가하고 바꾸기
-        self.embedding = nn.Embedding(vocab_size, hidden_size)
+        self.embedding = nn.Embedding(vocab_size, embedding_size)
 
         self.input_dropout = nn.Dropout(p=input_dropout_p)
         self.attention = Attention(self.hidden_size)

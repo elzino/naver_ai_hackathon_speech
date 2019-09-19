@@ -287,9 +287,9 @@ def main():
 
     parser = argparse.ArgumentParser(description='Speech hackathon Baseline')
     parser.add_argument('--hidden_size', type=int, default=512, help='hidden size of model (default: 512)')
+    parser.add_argument('--embedding_size', type=int, default=512, help=' size of embedding dimension (default: 128)')
     parser.add_argument('--layer_size', type=int, default=3, help='number of layers of model (default: 3)')
     parser.add_argument('--dropout', type=float, default=0.2, help='dropout rate in training (default: 0.2)')
-    parser.add_argument('--use_attention', action='store_true', help='use attention between encoder-decoder (default: False)')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in training (default: 32)')
     parser.add_argument('--workers', type=int, default=4, help='number of workers in dataset loader (default: 4)')
     parser.add_argument('--max_epochs', type=int, default=10, help='number of max epochs in training (default: 10)')
@@ -325,7 +325,7 @@ def main():
 
     dec = AttendSpellRNN(len(char2index), args.max_len, args.hidden_size * 2,
                      SOS_token, EOS_token,
-                     n_layers=args.layer_size, rnn_cell='gru',
+                     n_layers=args.layer_size, rnn_cell='gru', embedding_size=args.embedding_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=1, device=device)
 
     model = Seq2seq(enc, dec)
