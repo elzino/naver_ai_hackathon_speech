@@ -40,7 +40,7 @@ logger.setLevel(logging.INFO)
 PAD = 0
 N_FFT = 512
 SAMPLE_RATE = 16000
-MEL_FILTERS = 256
+MEL_FILTERS = 128
 
 target_dict = dict()
 
@@ -118,7 +118,7 @@ def get_script(filepath, bos_id, eos_id):
 
 class BaseDataset(Dataset):
     def __init__(self, wav_paths, script_paths, bos_id=1307, eos_id=1308,
-                 n_fft=512, hop_length=128, window=torch.hamming_window, n_mels=MEL_FILTERS, fmax=5000, train=False):
+                 n_fft=N_FFT, hop_length=128, window=torch.hamming_window, n_mels=MEL_FILTERS, fmax=5000, train=False):
         self.wav_paths = wav_paths
         self.script_paths = script_paths
         self.bos_id, self.eos_id = bos_id, eos_id

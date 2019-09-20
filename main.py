@@ -22,6 +22,7 @@ import torch.nn as nn
 import torch.optim as optim
 import Levenshtein as Lev
 
+import torchaudio
 import label_loader
 from loader import *
 from models.listen_attend_and_spell import ListenRNN, Seq2seq, AttendSpellRNN
@@ -215,6 +216,11 @@ def evaluate(model, dataloader, queue, criterion, device):
     return total_loss / total_num, total_dist / total_length
 
 def bind_model(model, optimizer=None):
+    melspectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=SAMPLE_RATE, n_fft=N_FFT,
+                                                          hop_length=128, window_fn=torch.hamming_window,
+                                                          n_mels=MEL_FILTERS, f_max=5000)
+    amplitude_to_DB = torchaudio.transforms.AmplitudeToDB(stype='power', top_db=80)
+
     def load(filename, **kwargs):
         state = torch.load(os.path.join(filename, 'model.pt'))
         model.load_state_dict(state['model'])
@@ -233,7 +239,7 @@ def bind_model(model, optimizer=None):
         model.eval()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        input = get_spectrogram_feature(wav_path).unsqueeze(0)
+        input = get_log_melspectrogram_feature(wav_path, melspectrogram, amplitude_to_DB).unsqueeze(0)
         input = input.to(device)
 
         logit = model(input_variable=input, input_lengths=None, teacher_forcing_ratio=0)
@@ -402,7 +408,7 @@ def main():
         nsml.save(args.save_name)
 
         if best_model:
-            nsml.save('best' + str(best_cer))
+            nsml.save('best' + str(eval_cer))
             best_cer = eval_cer
 
 if __name__ == "__main__":
