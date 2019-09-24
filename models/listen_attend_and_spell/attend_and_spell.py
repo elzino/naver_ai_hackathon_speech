@@ -101,9 +101,9 @@ class AttendSpellRNN(nn.Module):
 
         self.input_dropout = nn.Dropout(p=input_dropout_p)
         self.attention = Attention(self.hidden_size)
-        self.out = nn.Linear(self.hidden_size, vocab_size)
+        self.out = nn.Linear(2 * self.hidden_size, vocab_size)
 
-    def forward_step(self, input_var, last_bottom_hidden, last_upper_hidden, encoder_outputs, function):
+    def forward_step(self, input_var, last_bottom_hidden, last_upper_hidden, encoder_outputs, feat_lengths, function):
         # input_var = [list of int] = [B]
         # last_~~~_hidden = [layer x B x hidden_size]
         # encoder_outputs = [B x max_len x hidden_dim]
@@ -115,17 +115,19 @@ class AttendSpellRNN(nn.Module):
         self.bottom_rnn.flatten_parameters()
         self.upper_rnn.flatten_parameters()
 
-        attn = self.attention(encoder_outputs, last_bottom_hidden)  # (batch, max_len)
+        attn = self.attention(encoder_outputs, last_bottom_hidden, feat_lengths)  # (batch, max_len)
         context = attn.unsqueeze(1).bmm(encoder_outputs)  # B x 1 x H
         x = torch.cat([embedded, context], 2)  # B x 1 x (2 * H)
 
         x, bottom_hidden = self.bottom_rnn(x, last_bottom_hidden)
         x, upper_hidden = self.upper_rnn(x, last_upper_hidden)  # B x 1 x H
-        predicted_prob = function(self.out(x.squeeze(1)), dim=-1)  # B x vocab_size
+        x = torch.cat([x.squeeze(1), context.squeeze(1)], 1)  # B x (2 * H)
+        predicted_prob = function(self.out(x), dim=-1)  # B x vocab_size
 
         return predicted_prob, bottom_hidden, upper_hidden, attn
 
-    def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None, function=F.log_softmax, teacher_forcing_ratio=0):
+    def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None, feat_lengths=None,
+                function=F.log_softmax, teacher_forcing_ratio=0):
         ret_dict = dict()
         ret_dict[AttendSpellRNN.KEY_ATTN_SCORE] = list()
 
@@ -158,13 +160,13 @@ class AttendSpellRNN(nn.Module):
             decoder_input = inputs[:, :-1]
             for di in range(max_length):
                 decoder_output, bottom_hidden, upper_hidden, attn \
-                    = self.forward_step(decoder_input[:, di], bottom_hidden, upper_hidden, encoder_outputs, function)
+                    = self.forward_step(decoder_input[:, di], bottom_hidden, upper_hidden, encoder_outputs, feat_lengths, function)
                 decode(di, decoder_output, attn)
         else:
             decoder_input = inputs[:, 0]
             for di in range(max_length):
                 decoder_output, bottom_hidden, upper_hidden, step_attn \
-                    = self.forward_step(decoder_input, bottom_hidden, upper_hidden, encoder_outputs, function)
+                    = self.forward_step(decoder_input, bottom_hidden, upper_hidden, encoder_outputs, feat_lengths, function)
                 symbols = decode(di, decoder_output, step_attn)  # batch x 1
                 decoder_input = symbols.squeeze(1)
 

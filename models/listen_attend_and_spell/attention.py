@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -25,7 +26,6 @@ class Attention(nn.Module):
         super().__init__()
         self.Wa = nn.Linear(hidden_dim, hidden_dim, bias=False)
         self.Ua = nn.Linear(hidden_dim, hidden_dim, bias=False)
-        self.Va = nn.Linear(hidden_dim, 1, bias=False)
 
     def forward(self, encoder_outputs, last_hiddens, seq_lens=None):
         """
@@ -40,14 +40,15 @@ class Attention(nn.Module):
         """
 
         last_hidden = last_hiddens.transpose(0, 1)  # (batch, 1, hidden_dim)
-        attention_energy = self.Va(torch.tanh(self.Wa(encoder_outputs) + self.Ua(last_hidden)))  # (batch, max_len, 1)
+        attention_energy = self.Wa(encoder_outputs).bmm(self.Ua(last_hidden).transpose(1, 2))  # (batch, max_len, 1)
         attention_energy = attention_energy.squeeze(-1)  # (batch, max_len)
-        #  attention_energy = self.mask_3d(attention_energy, seq_lens, -float('inf'))
-        #  -> input과 여기서 seq_len이 1대1 대응이 안되서 사용 불가능
+        if seq_lens is not None:
+            attention_energy = self.mask_3d(attention_energy, seq_lens, -float('inf'))
         ai = F.softmax(attention_energy, -1)  # (batch, max_len)
         return ai
 
     def mask_3d(self, attention_energy, seq_lens, value):
+        seq_lens = np.ceil(np.array(seq_lens) / 4).astype(int)
         for idx, length in enumerate(seq_lens):
             attention_energy[idx, length:] = value
         return attention_energy

@@ -65,14 +65,15 @@ class Seq2seq(nn.Module):
         self.decoder.bottom_rnn.flatten_parameters()
         self.decoder.upper_rnn.flatten_parameters()
 
-    def forward(self, input_variable, input_lengths=None, target_variable=None,
+    def forward(self, input_variable, feat_lengths=None, target_variable=None,
                 teacher_forcing_ratio=0):
 
-        encoder_outputs, encoder_hidden = self.encoder(input_variable, input_lengths)
+        encoder_outputs, encoder_hidden = self.encoder(input_variable)
 
         result = self.decoder(inputs=target_variable,
                               encoder_hidden=encoder_hidden,
                               encoder_outputs=encoder_outputs,
+                              feat_lengths=feat_lengths,
                               function=self.decode_function,
                               teacher_forcing_ratio=teacher_forcing_ratio)
 
