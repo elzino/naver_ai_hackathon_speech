@@ -58,20 +58,20 @@ def spec_augment(mel_spectrogram, time_warping_para=80, frequency_masking_para=2
 
         # Step 1 : Time warping
         # 논문에서 time warping은 효과가 있긴 있으나 작다고 현실적인 상황 고려해 적용 안해도 된다고 함
-        warped_mel_spectrogram = time_warp(mel_spectrogram)
+        # warped_mel_spectrogram = time_warp(mel_spectrogram)
 
         # Step 2 : Time masking
         for i in range(time_mask_num):
             t = np.random.uniform(low=0.0, high=time_masking_para)
             t = int(t)
             t0 = random.randint(0, tau - t)
-            warped_mel_spectrogram[t0:t0 + t, :] = 0
+            mel_spectrogram[t0:t0 + t, :] = 0
 
         # Step 3 : Frequency masking
         for i in range(frequency_mask_num):
             f = np.random.uniform(low=0.0, high=frequency_masking_para)
             f = int(f)
             f0 = random.randint(0, v - f)
-            warped_mel_spectrogram[:, f0:f0 + f] = 0
+            mel_spectrogram[:, f0:f0 + f] = 0
 
-    return warped_mel_spectrogram
+    return mel_spectrogram
