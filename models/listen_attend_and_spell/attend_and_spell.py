@@ -102,7 +102,7 @@ class AttendSpellRNN(nn.Module):
 
         self.input_dropout = nn.Dropout(p=input_dropout_p)
         self.attention = Attention(self.hidden_size)
-        self.out = nn.Linear(2 * self.hidden_size, vocab_size)
+        self.out = nn.Linear(self.hidden_size, vocab_size)
 
     def forward_step(self, input_var, last_bottom_hidden, last_upper_hidden, encoder_outputs, feat_lengths, function):
         # input_var = [list of int] = [B]
@@ -122,8 +122,7 @@ class AttendSpellRNN(nn.Module):
 
         x, bottom_hidden = self.bottom_rnn(x, last_bottom_hidden)
         x, upper_hidden = self.upper_rnn(x, last_upper_hidden)  # B x 1 x H
-        x = torch.cat([x.squeeze(1), context.squeeze(1)], 1)  # B x (2 * H)
-        predicted_prob = function(self.out(x), dim=-1)  # B x vocab_size
+        predicted_prob = function(self.out(x.squeeze(1)), dim=-1)
 
         return predicted_prob, bottom_hidden, upper_hidden, attn
 
