@@ -93,6 +93,7 @@ class AttendSpellRNN(nn.Module):
 
         assert n_layers > 1
 
+        dropout_p = 0 if n_layers == 2 else dropout_p
         self.bottom_rnn = self.rnn_cell(hidden_size + embedding_size, hidden_size, batch_first=True)
         self.upper_rnn = self.rnn_cell(hidden_size, hidden_size, n_layers-1, batch_first=True, dropout=dropout_p)
 
@@ -132,7 +133,7 @@ class AttendSpellRNN(nn.Module):
         ret_dict[AttendSpellRNN.KEY_ATTN_SCORE] = list()
 
         inputs, batch_size, max_length = self._validate_args(inputs, encoder_outputs, teacher_forcing_ratio)
-        bottom_hidden, upper_hidden = self._init_state(encoder_hidden)
+        bottom_hidden, upper_hidden = self._init_state_zero(encoder_hidden)
 
         use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
 
@@ -184,8 +185,8 @@ class AttendSpellRNN(nn.Module):
             encoder_hidden = tuple([self._cat_directions(h) for h in encoder_hidden])
         else:
             encoder_hidden = self._cat_directions(encoder_hidden)
-        bottom_hidden = encoder_hidden[0, :, :].unsqueeze(0)
-        upper_hidden = encoder_hidden[1:, :, :]
+        bottom_hidden = encoder_hidden[-self.n_layers, :, :].unsqueeze(0)
+        upper_hidden = encoder_hidden[(-self.n_layers + 1):, :, :]
         return bottom_hidden, upper_hidden
 
     def _init_state_zero(self, batch_size):
