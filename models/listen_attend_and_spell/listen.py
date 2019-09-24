@@ -94,6 +94,7 @@ class ListenRNN(nn.Module):
         # BxTxCxD => BxTx(CxD)
         x = x.view(sizes[0], sizes[1], sizes[2] * sizes[3])
 
+        #  if self.training:
         self.rnn.flatten_parameters()
 
         # x = BxTxH

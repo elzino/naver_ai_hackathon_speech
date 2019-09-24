@@ -111,6 +111,7 @@ class AttendSpellRNN(nn.Module):
         embedded = self.embedding(input_var)
         embedded = self.input_dropout(embedded).unsqueeze(1)  # B x 1 x H
 
+        #  if self.training:
         self.bottom_rnn.flatten_parameters()
         self.upper_rnn.flatten_parameters()
 

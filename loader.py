@@ -37,18 +37,33 @@ FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=FORMAT)
 logger.setLevel(logging.INFO)
 
+
 PAD = 0
+
+#  mel_spectrogram parameters
 N_FFT = 512
 SAMPLE_RATE = 16000
 MEL_FILTERS = 128
+HOP_LENGTH = 128
+WINDOW_FUNCTION = torch.hamming_window
+F_MAX = 5000
+
+#  spec_augment parameters
+TIME_WARPING = None
+FREQUENCY_MASKING = 27
+TIME_MASKING = 100
+FREQUENCY_MASKING_NUM = 1
+TIME_MASKING_NUM = 1
 
 target_dict = dict()
+
 
 def load_targets(path):
     with open(path, 'r') as f:
         for no, line in enumerate(f):
             key, target = line.strip().split(',')
             target_dict[key] = target
+
 
 def get_spectrogram_feature(filepath):
     (rate, width, sig) = wavio.readwav(filepath)
@@ -77,30 +92,19 @@ def get_log_melspectrogram_feature(filepath, melspectrogram, amplitude_to_db):
     sig, rate = torchaudio.load_wav(filepath)  # C * time
 
     S = melspectrogram(sig)  # C * n_mels * time
-    S = amplitude_to_db(S)  # C * nmels * time
+    S = amplitude_to_db(S)  # C * n_mels * time
     S = S.detach().numpy()
     S = torch.FloatTensor(S)
-    feat = S.squeeze(0).transpose(0, 1)  # time * nmels
+    feat = S.squeeze(0).transpose(0, 1)  # time * n_mels
     feat -= feat.mean()
 
-    """
-    audio, sr = librosa.load(filepath, sr=None)
-    #  fmax 8000일 때 보다 5000 일때 조금 느린 느낌이 있음. 만약 병목현상 발생하면 여기 들여봐야할 듯
-    S = librosa.feature.melspectrogram(y=audio, sr=sr, n_fft=n_fft, hop_length=hop_length, window=window, n_mels=n_mels, fmax=fmax)
-    S = librosa.power_to_db(S)
-    feat = torch.FloatTensor(S).transpose(0, 1)  # time * melFilter
-    feat -= feat.mean()  # mean = 0 로 normalize
-    """
-
-    return feat  # time * melFilter
+    return feat  # time * n_mels
 
 
-def get_augmented_log_melspectrogram(filepath, melspectrogram, amplitude_to_DB, time_warping_para=80,
-                                     frequency_masking_para=27, time_masking_para=100,
-                                     frequency_mask_num=1, time_mask_num=1):
+def get_augmented_log_melspectrogram(filepath, melspectrogram, amplitude_to_DB):
     mel_spectrogram = get_log_melspectrogram_feature(filepath, melspectrogram, amplitude_to_DB)
-    augmented_feat = spec_augment(mel_spectrogram, time_warping_para, frequency_masking_para, time_masking_para,
-                                  frequency_mask_num, time_mask_num)
+    augmented_feat = spec_augment(mel_spectrogram, TIME_WARPING, FREQUENCY_MASKING, TIME_MASKING,
+                                  FREQUENCY_MASKING_NUM, TIME_MASKING_NUM)
     return augmented_feat  # time * mel_filter
 
 
@@ -116,15 +120,15 @@ def get_script(filepath, bos_id, eos_id):
     result.append(eos_id)
     return result
 
+
 class BaseDataset(Dataset):
-    def __init__(self, wav_paths, script_paths, bos_id=1307, eos_id=1308,
-                 n_fft=N_FFT, hop_length=128, window=torch.hamming_window, n_mels=MEL_FILTERS, fmax=5000, train=False):
+    def __init__(self, wav_paths, script_paths, bos_id=1307, eos_id=1308, train=False):
         self.wav_paths = wav_paths
         self.script_paths = script_paths
         self.bos_id, self.eos_id = bos_id, eos_id
-        self.melspectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=SAMPLE_RATE, n_fft=n_fft,
-                                                                   hop_length=hop_length, window_fn=window,
-                                                                   n_mels=n_mels, f_max=fmax)
+        self.melspectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=SAMPLE_RATE, n_fft=N_FFT,
+                                                                   hop_length=HOP_LENGTH, window_fn=WINDOW_FUNCTION,
+                                                                   n_mels=MEL_FILTERS, f_max=F_MAX)
         self.amplitude_to_DB = torchaudio.transforms.AmplitudeToDB(stype='power', top_db=80)
         if train:
             self.get_feature = get_augmented_log_melspectrogram
@@ -144,6 +148,7 @@ class BaseDataset(Dataset):
 
     def __del__(self):
         del self.melspectrogram, self.amplitude_to_DB, self.get_feature
+
 
 def _collate_fn(batch):
     # batch = [(feat, script) * batch_size]
@@ -181,6 +186,7 @@ def _collate_fn(batch):
         targets[x].narrow(0, 0, len(target)).copy_(torch.LongTensor(target))
 
     return seqs, targets, seq_lengths, target_lengths
+
 
 class BaseDataLoader(threading.Thread):
     def __init__(self, dataset, queue, batch_size, thread_id):
@@ -225,6 +231,7 @@ class BaseDataLoader(threading.Thread):
             batch = self.collate_fn(items)
             self.queue.put(batch)
         logger.info('loader %d stop' % (self.thread_id))
+
 
 class MultiLoader():
     def __init__(self, dataset_list, queue, batch_size, worker_size):

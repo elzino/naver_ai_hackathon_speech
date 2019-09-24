@@ -217,8 +217,8 @@ def evaluate(model, dataloader, queue, criterion, device):
 
 def bind_model(model, optimizer=None):
     melspectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=SAMPLE_RATE, n_fft=N_FFT,
-                                                          hop_length=128, window_fn=torch.hamming_window,
-                                                          n_mels=MEL_FILTERS, f_max=5000)
+                                                          hop_length=HOP_LENGTH, window_fn=WINDOW_FUNCTION,
+                                                          n_mels=MEL_FILTERS, f_max=F_MAX)
     amplitude_to_DB = torchaudio.transforms.AmplitudeToDB(stype='power', top_db=80)
 
     def load(filename, **kwargs):
