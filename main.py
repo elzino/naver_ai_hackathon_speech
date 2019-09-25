@@ -242,7 +242,7 @@ def bind_model(model, optimizer=None):
         input = get_log_melspectrogram_feature(wav_path, melspectrogram, amplitude_to_DB).unsqueeze(0)
         input = input.to(device)
 
-        logit = model(input_variable=input, input_lengths=None, teacher_forcing_ratio=0)
+        logit = model(input_variable=input, teacher_forcing_ratio=0)
         logit = torch.stack(logit, dim=1).to(device)
 
         y_hat = logit.max(-1)[1]
