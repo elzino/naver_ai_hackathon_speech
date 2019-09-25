@@ -24,8 +24,8 @@ class Attention(nn.Module):
 
         """
         super().__init__()
-        self.Wa = nn.Linear(hidden_dim, hidden_dim, bias=False)
-        self.Ua = nn.Linear(hidden_dim, hidden_dim, bias=False)
+        self.Wa = nn.Linear(hidden_dim, hidden_dim, bias=True)
+        self.Ua = nn.Linear(hidden_dim, hidden_dim, bias=True)
 
     def forward(self, encoder_outputs, last_hiddens, seq_lens=None):
         """

@@ -132,7 +132,7 @@ class AttendSpellRNN(nn.Module):
         ret_dict[AttendSpellRNN.KEY_ATTN_SCORE] = list()
 
         inputs, batch_size, max_length = self._validate_args(inputs, encoder_outputs, teacher_forcing_ratio)
-        bottom_hidden, upper_hidden = self._init_state_zero(batch_size)
+        bottom_hidden, upper_hidden = self._init_state(encoder_hidden)
 
         use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
 
