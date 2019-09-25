@@ -197,7 +197,7 @@ def evaluate(model, dataloader, queue, criterion, device):
             target = scripts[:, 1:]
 
             model.module.flatten_parameters()
-            logit = model(feats, feat_lengths, scripts, teacher_forcing_ratio=0.0)
+            logit = model(feats, None, scripts, teacher_forcing_ratio=0.0)
 
             logit = torch.stack(logit, dim=1).to(device)  # batch x seq_len x vocab_size
             y_hat = logit.max(-1)[1]
@@ -242,7 +242,7 @@ def bind_model(model, optimizer=None):
         input = get_log_melspectrogram_feature(wav_path, melspectrogram, amplitude_to_DB).unsqueeze(0)
         input = input.to(device)
 
-        logit = model(input_variable=input, input_lengths=None, teacher_forcing_ratio=0)
+        logit = model(input_variable=input, feat_lengths=None, teacher_forcing_ratio=0)
         logit = torch.stack(logit, dim=1).to(device)
 
         y_hat = logit.max(-1)[1]
@@ -294,8 +294,8 @@ def main():
     parser = argparse.ArgumentParser(description='Speech hackathon Baseline')
     parser.add_argument('--hidden_size', type=int, default=512, help='hidden size of model (default: 512)')
     parser.add_argument('--embedding_size', type=int, default=512, help=' size of embedding dimension (default: 128)')
-    parser.add_argument('--encoder_layer_size', type=int, default=4, help='number of layers of model (default: 3)')
-    parser.add_argument('--decoder_layer_size', type=int, default=2, help='number of layers of model (default: 3)')
+    parser.add_argument('--encoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
+    parser.add_argument('--decoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
     parser.add_argument('--dropout', type=float, default=0.2, help='dropout rate in training (default: 0.2)')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in training (default: 32)')
     parser.add_argument('--workers', type=int, default=4, help='number of workers in dataset loader (default: 4)')
