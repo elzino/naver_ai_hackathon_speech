@@ -10,18 +10,6 @@ import torch.nn.functional as F
 
 class Attention(nn.Module):
     def __init__(self, hidden_dim):
-        """
-        Args
-            hidden_dim: dimension of hidden unit in LSTM = numdirections * hidden_size
-
-        Inputs
-            encoder_outputs: (seq_len, batch, num_directions * hidden_size)
-            last_hidden: last_hidden (batch, decoder_hidden_dim)
-
-        Outputs
-            context: (seq_len, batch, decoder_hidden_dim)
-
-        """
         super().__init__()
         self.Wa = nn.Linear(hidden_dim, hidden_dim, bias=False)
         self.Ua = nn.Linear(hidden_dim, hidden_dim, bias=False)

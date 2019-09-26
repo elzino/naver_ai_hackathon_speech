@@ -68,11 +68,12 @@ class AttendSpellRNN(nn.Module):
     KEY_SEQUENCE = 'sequence'
 
     def __init__(self, vocab_size, max_len, hidden_size, sos_id, eos_id, n_layers=2, rnn_cell='gru',
-                 embedding_size=512, input_dropout_p=0, dropout_p=0, beam_width=1, device='cpu'):
+                 embedding_size=512, input_dropout_p=0, dropout_p=0, beam_width=4, device='cpu'):
         super().__init__()
 
         self.device = device
 
+        self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.max_length = max_len
 
@@ -137,9 +138,56 @@ class AttendSpellRNN(nn.Module):
 
         decoder_outputs = []
         sequence_symbols = []
+
+        beam_scores = torch.zeros(batch_size, self.beam_width)  # B x beam_width
+        beam_outputs = [[[None] for _ in range(self.beam_width)] for _ in range(batch_size)]  # B x beam_width x 1
+        beam_symbols = [[[None] for _ in range(self.beam_width)] for _ in range(batch_size)]  # B x beam_width x 1
+        finished_symbols = []
+        finished_score = []
+
         lengths = np.array([max_length] * batch_size)
 
         def decode(step, step_output, step_attn):
+            # step_output = B x 1 x vocab_size
+            decoder_outputs.append(step_output)
+            ret_dict[AttendSpellRNN.KEY_ATTN_SCORE].append(step_attn)
+            # TODO : BEAM Search 추가하기
+            symbols = step_output.topk(1)[1]  # topk(n) [0]는 값 [1]은 index
+            sequence_symbols.append(symbols)
+
+            eos_batches = symbols.data.eq(self.eos_id)
+            if eos_batches.dim() > 0:
+                eos_batches = eos_batches.cpu().view(-1).numpy()
+                update_idx = ((lengths > step) & eos_batches) != 0
+                lengths[update_idx] = len(sequence_symbols)  # eos 처음 나타나는 곳에서 그 길이로 update
+            return symbols
+
+        def decode_with_beam(step, step_output, step_attn):
+            # step_output = (beam_width x B) x 1 x vocab_size
+            step_output = step_output.view(self.beam_width, batch_size, -1)  # beam_width x B x vocab_size
+            for i in range(batch_size):
+                step_output_frag = step_output[:, i, :]  # beam_width x vocab_size
+                score = beam_scores[i].view(self.beam_width, 1) + torch.log(step_output_frag)  # beam_width x vocab_size
+                score_value, indices = torch.flatten(score).topk(self.beam_width)
+                beam_scores[i] = score_value
+
+                new_output = []
+                new_symbols = []
+                for j in range(self.beam_width):
+                    index = indices[j] // self.vocab_size
+                    symbol = indices[j] % self.vocab_size
+                    new_output.append(list(beam_outputs[i][index]))
+                    new_output[j].append(step_output_frag[index])
+                    new_symbols.append(list(beam_symbols[i][index]))
+                    new_symbols[j].append(symbol)
+                    if symbol == self.eos_id:
+                        finished_symbols.append()
+                beam_outputs[i] = new_output
+                beam_symbols[i] = new_symbols
+
+
+
+                # eos면 점수 낮게
             decoder_outputs.append(step_output)
             ret_dict[AttendSpellRNN.KEY_ATTN_SCORE].append(step_attn)
             # TODO : BEAM Search 추가하기
@@ -217,3 +265,9 @@ class AttendSpellRNN(nn.Module):
             max_length = inputs.size(1) - 1  # minus the start of sequence symbol
 
         return inputs, batch_size, max_length
+
+    def _augment_hidden_state(self, hidden_state):
+        return torch.cat([hidden_state] * self.beam_width, 0)
+
+    def _augment_input(self, input):
+        return torch.cat([input] * self.beam_width, 0)
