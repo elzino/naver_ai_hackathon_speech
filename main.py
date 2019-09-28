@@ -300,7 +300,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in training (default: 32)')
     parser.add_argument('--workers', type=int, default=4, help='number of workers in dataset loader (default: 4)')
     parser.add_argument('--max_epochs', type=int, default=10, help='number of max epochs in training (default: 10)')
-    parser.add_argument('--lr', type=float, default=1e-04, help='learning rate (default: 0.0001)')
+    parser.add_argument('--lr', type=float, default=1e-02, help='learning rate (default: 0.0001)')
     parser.add_argument('--teacher_forcing', type=float, default=0.5, help='teacher forcing ratio in decoder (default: 0.5)')
     parser.add_argument('--max_len', type=int, default=80, help='maximum characters of sentence (default: 80)')
     parser.add_argument('--no_cuda', action='store_true', default=False, help='disables CUDA training')
@@ -343,7 +343,8 @@ def main():
 
     model = nn.DataParallel(model).to(device)
 
-    optimizer = optim.Adam(model.module.parameters(), lr=args.lr)
+    optimizer = optim.Adam(model.module.parameters(), lr=0)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[15, 50], gamma=0.1)
     criterion = nn.CrossEntropyLoss(reduction='sum', ignore_index=PAD_token).to(device)
 
     bind_model(model, optimizer)
@@ -411,6 +412,13 @@ def main():
         if best_model:
             nsml.save('best' + str(eval_cer))
             best_cer = eval_cer
+
+        if epoch == begin_epoch:
+            for group in optimizer.param_groups:
+                group['lr'] = args.lr
+
+        scheduler.step()
+
 
 if __name__ == "__main__":
     main()
