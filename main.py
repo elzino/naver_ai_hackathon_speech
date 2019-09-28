@@ -343,7 +343,7 @@ def main():
 
     model = nn.DataParallel(model).to(device)
 
-    optimizer = optim.Adam(model.module.parameters(), lr=0)
+    optimizer = optim.Adam(model.module.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[15, 50], gamma=0.1)
     criterion = nn.CrossEntropyLoss(reduction='sum', ignore_index=PAD_token).to(device)
 
@@ -382,6 +382,9 @@ def main():
     train_begin = time.time()
 
     for epoch in range(begin_epoch, args.max_epochs):
+        if epoch == begin_epoch:
+            for group in optimizer.param_groups:
+                group['lr'] = 0
 
         train_queue = queue.Queue(args.workers * 2)
 
@@ -412,10 +415,6 @@ def main():
         if best_model:
             nsml.save('best' + str(eval_cer))
             best_cer = eval_cer
-
-        if epoch == begin_epoch:
-            for group in optimizer.param_groups:
-                group['lr'] = args.lr
 
         scheduler.step()
 
