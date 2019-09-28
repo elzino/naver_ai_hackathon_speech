@@ -134,7 +134,6 @@ class AttendSpellRNN(nn.Module):
         encoder_outputs = encoder_outputs.repeat(self.beam_width,1,1)
         self.bottom_rnn.flatten_parameters()
         self.upper_rnn.flatten_parameters()
-
         attn = self.attention(encoder_outputs, last_bottom_hidden)  # (batch, max_len)
         context = attn.unsqueeze(1).bmm(encoder_outputs)  # B x 1 x H
         x = torch.cat([embedded, context], 2)  # B x 1 x (2 * H)
@@ -155,7 +154,6 @@ class AttendSpellRNN(nn.Module):
 
         inputs, batch_size, max_length = self._validate_args(inputs, encoder_outputs, teacher_forcing_ratio)
         use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
-        
         decoder_outputs = []
         sequence_symbols = []
         lengths = np.array([max_length] * batch_size)
@@ -185,6 +183,8 @@ class AttendSpellRNN(nn.Module):
                 decode(di, decoder_output, attn)
             ret_dict[AttendSpellRNN.KEY_SEQUENCE] = sequence_symbols
             ret_dict[AttendSpellRNN.KEY_LENGTH] = lengths.tolist()
+            decoder_outputs_temp = torch.stack(decoder_outputs, dim=1).to(self.device)  # batch x seq_len x vocab_size
+            hyps = decoder_outputs_temp.max(-1)[1]
         else:
             bottom_hidden, upper_hidden = self._init_state_beam(encoder_hidden)
             beam = [
@@ -199,7 +199,7 @@ class AttendSpellRNN(nn.Module):
                 # (a) Construct batch x beam_size nxt words.
                 # Get all the pending current beam words and arrange for forward.
 
-                decoder_input = torch.stack([b.current_predictions for b in beam])
+                decoder_input = torch.stack([b.current_predictions for b in beam]).to(self.device) 
                 decoder_input = decoder_input.view(-1)
                 decoder_output, bottom_hidden, upper_hidden, step_attn \
                     = self.forward_step_beam(decoder_input, bottom_hidden, upper_hidden, encoder_outputs, function)
@@ -211,11 +211,11 @@ class AttendSpellRNN(nn.Module):
                 for j, b in enumerate(beam):
                     if not b.done:
                         b.advance(decoder_output[j, :],
-                                step_attn.data[j, :, :])
+                                    step_attn.data[j, :, :])
                     select_indices_array.append(
-                        list(map(lambda x: x + j * self.beam_width, b.current_origin))
+                            list(map(lambda x: x + j * self.beam_width, b.current_origin))
                     )
-                select_indices = torch.tensor(select_indices_array, dtype = torch.int64).view(-1)
+                select_indices = torch.tensor(select_indices_array, dtype = torch.int64).view(-1).to(self.device) 
                 bottom_hidden, upper_hidden = self._select_indices_hidden(select_indices, bottom_hidden, upper_hidden)
 
             for b in beam:
@@ -227,19 +227,25 @@ class AttendSpellRNN(nn.Module):
                     attn.append(att)
                     beam_indexes.append(beam_index)
                     probs.append(prob)
-                probs = torch.stack(probs[0])
+
+                probs = torch.stack(probs[0]).to(self.device) 
+                probs = b.fill_empty_sequence(probs, max_length)      # make length max_length of sequence
+                hyps = torch.stack(hyps[0]).to(self.device) 
+                hyps = b.fill_empty_sequence(hyps , max_length)
+                
                 ret_dict[AttendSpellRNN.PROBABILITY].append(probs)
                 ret_dict[AttendSpellRNN.BEAM_INDEX].append(beam_indexes)
                 ret_dict[AttendSpellRNN.KEY_SEQUENCE].append(hyps)
                 ret_dict[AttendSpellRNN.KEY_ATTN_SCORE].append(attn)
-            
-            probs = torch.stack(ret_dict[AttendSpellRNN.PROBABILITY])
-            probs = torch.transpose(probs, 0, 1)
 
+            hyps = torch.stack(ret_dict[AttendSpellRNN.KEY_SEQUENCE]).to(self.device) 
+            probs = torch.stack(ret_dict[AttendSpellRNN.PROBABILITY]).to(self.device) 
+            probs = torch.transpose(probs, 0, 1)
             for i in range(probs.size(0)):
                 decoder_outputs.append(probs[i])
+        
         # decoder_outputs = [seq_len, batch, vocab_size]
-        return decoder_outputs, bottom_hidden, upper_hidden, ret_dict
+        return decoder_outputs, hyps, bottom_hidden, upper_hidden
     def _select_indices_hidden(self, select_indices, bottom_hidden, upper_hidden):
         return torch.index_select(bottom_hidden, 1, select_indices), torch.index_select(upper_hidden, 1, select_indices)
     def _init_state(self, encoder_hidden):

@@ -43,7 +43,7 @@ class Beam(object):
 
         # The outputs at each time-step.
         self.next_ys = [self.tt.LongTensor(size)
-                        .fill_(pad)]
+                        .fill_(bos)]
         self.next_ys[0][0] = bos
 
         # Has EOS topped the beam yet.
@@ -183,6 +183,12 @@ class Beam(object):
             k = self.prev_ks[j][k]
 
         return hyp[::-1], torch.stack(attn[::-1]), key_index[::-1], probability[::-1]
+
+    def fill_empty_sequence(self, stack, max_length):
+        for i in range(stack.size(0), max_length):
+            stack = torch.cat([stack, stack[0].unsqueeze(0)])
+        return stack
+
 
 class GNMTGlobalScorer(object):
     """NMT re-ranking.
