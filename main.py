@@ -121,6 +121,7 @@ def train(model, total_batch_size, queue, criterion, optimizer, device, train_be
         if lr_warm_up:
             step += 1
             for group in optimizer.param_groups:
+                print(group['lr'])
                 group['lr'] = lr * 0.001 * min(1000, step)
 
 
@@ -299,13 +300,13 @@ def main():
     parser = argparse.ArgumentParser(description='Speech hackathon Baseline')
     parser.add_argument('--hidden_size', type=int, default=512, help='hidden size of model (default: 512)')
     parser.add_argument('--embedding_size', type=int, default=512, help=' size of embedding dimension (default: 128)')
-    parser.add_argument('--encoder_layer_size', type=int, default=2, help='number of layers of model (default: 2)')
-    parser.add_argument('--decoder_layer_size', type=int, default=2, help='number of layers of model (default: 2)')
+    parser.add_argument('--encoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
+    parser.add_argument('--decoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
     parser.add_argument('--dropout', type=float, default=0.2, help='dropout rate in training (default: 0.2)')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in training (default: 32)')
     parser.add_argument('--workers', type=int, default=4, help='number of workers in dataset loader (default: 4)')
     parser.add_argument('--max_epochs', type=int, default=10, help='number of max epochs in training (default: 10)')
-    parser.add_argument('--lr', type=float, default=4e-04, help='learning rate (default: 0.0004)')
+    parser.add_argument('--lr', type=float, default=1e-04, help='learning rate (default: 0.0001)')
     parser.add_argument('--teacher_forcing', type=float, default=0.5, help='teacher forcing ratio in decoder (default: 0.5)')
     parser.add_argument('--max_len', type=int, default=80, help='maximum characters of sentence (default: 80)')
     parser.add_argument('--no_cuda', action='store_true', default=False, help='disables CUDA training')
@@ -349,7 +350,7 @@ def main():
     model = nn.DataParallel(model).to(device)
 
     optimizer = optim.Adam(model.module.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 20, 40, 70], gamma=0.5)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[25, 40], gamma=0.5)
     criterion = nn.CrossEntropyLoss(reduction='sum', ignore_index=PAD_token).to(device)
 
     bind_model(model, optimizer)
