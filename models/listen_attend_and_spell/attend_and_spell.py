@@ -137,8 +137,8 @@ class AttendSpellRNN(nn.Module):
         embedded = self.embedding(input_var)
         embedded = self.input_dropout(embedded).unsqueeze(1)  # B x 1 x H
 
-        encoder_outputs = encoder_outputs.repeat(self.beam_width, 1, 1)
         batch_size, encoder_length, encoder_hidden_dim = encoder_outputs.size()
+        encoder_outputs = encoder_outputs.repeat(self.beam_width, 1, 1)
         encoder_outputs = encoder_outputs.view(self.beam_width, batch_size, encoder_length, encoder_hidden_dim)
         encoder_outputs = encoder_outputs.transpose(0, 1)
         encoder_outputs = encoder_outputs.reshape(self.beam_width * batch_size, encoder_length, encoder_hidden_dim)
