@@ -99,6 +99,7 @@ class Beam(object):
             # assumes there are len(word_probs) predictions OTHER
             # than EOS that are greater than -1e20
             for k in range(len(word_probs)):
+                word_probs_temp = word_probs.copy()
                 word_probs[k][self._eos] = -1e20
 
         # Sum the previous scores.
@@ -113,7 +114,7 @@ class Beam(object):
             if self.block_ngram_repeat > 0:
                 le = len(self.next_ys)
                 for j in range(self.next_ys[-1].size(0)):
-                    hyp, _ = self.get_hyp(le - 1, j)
+                    hyp, _, _, _ = self.get_hyp(le - 1, j)
                     ngrams = set()
                     fail = False
                     gram = []
@@ -134,7 +135,7 @@ class Beam(object):
         flat_beam_scores = beam_scores.view(-1)
         best_scores, best_scores_id = flat_beam_scores.topk(self.size, 0,
                                                             True, True)
-        self.all_probs.append(word_probs)   
+        self.all_probs.append(word_probs_temp)   
         self.all_scores.append(self.scores)
         self.scores = best_scores
 
