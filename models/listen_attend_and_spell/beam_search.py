@@ -89,7 +89,7 @@ class Beam(object):
         Returns:
             bool: True if beam search is complete.
         """
-
+        word_probs_temp = word_probs.clone()
         num_words = word_probs.size(1)
         if self.stepwise_penalty:
             self.global_scorer.update_score(self, attn_out)
@@ -99,7 +99,6 @@ class Beam(object):
             # assumes there are len(word_probs) predictions OTHER
             # than EOS that are greater than -1e20
             for k in range(len(word_probs)):
-                word_probs_temp = word_probs.copy()
                 word_probs[k][self._eos] = -1e20
 
         # Sum the previous scores.

@@ -201,7 +201,7 @@ class AttendSpellRNN(nn.Module):
         else:
             bottom_hidden, upper_hidden = self._init_state_beam(encoder_hidden)
             beam = [
-                Beam(self.beam_width, self.pad_id, self.sos_id, self.eos_id, cuda=True)
+                Beam(self.beam_width, self.pad_id, self.sos_id, self.eos_id, min_length=0, block_ngram_repeat=3, cuda=True)
                 for _ in range(batch_size)
             ]
 
