@@ -116,7 +116,12 @@ def get_script(filepath, bos_id, eos_id):
     result.append(bos_id)
     for i in range(len(tokens)):
         if len(tokens[i]) > 0:
-            result.append(int(tokens[i]))
+            token_num = int(tokens[i])
+            if token_num == 662:
+                continue
+            elif token_num >= 663:
+                token_num -= 1
+            result.append(token_num)
     result.append(eos_id)
     return result
 

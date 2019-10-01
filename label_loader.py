@@ -28,8 +28,14 @@ def load_label(label_path):
             char = char.strip()
             if len(char) == 0:
                 char = ' '
+                continue
 
-            char2index[char] = int(index)
-            index2char[int(index)] = char
+            index_num = int(index)
+
+            if index_num >= 663:
+                index_num -= 1
+
+            char2index[char] = index_num
+            index2char[index_num] = char
 
     return char2index, index2char
