@@ -322,6 +322,8 @@ def main():
     EOS_token = char2index['</s>']
     PAD_token = char2index['_']
 
+    vocab_size = len(char2index)
+
     random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
@@ -336,7 +338,7 @@ def main():
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
                      n_layers=args.encoder_layer_size, rnn_cell='gru')
 
-    dec = AttendSpellRNN(len(char2index), args.max_len, args.hidden_size * 2,
+    dec = AttendSpellRNN(vocab_size, args.max_len, args.hidden_size * 2,
                      SOS_token, EOS_token,
                      n_layers=args.decoder_layer_size, rnn_cell='gru', embedding_size=args.embedding_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=1, device=device)
@@ -351,7 +353,7 @@ def main():
 
     optimizer = optim.Adam(model.module.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[25, 40], gamma=0.5)
-    criterion = nn.CrossEntropyLoss(reduction='sum', ignore_index=PAD_token).to(device)
+    criterion = LabelSmoothingLoss(vocab_size, ignore_index=PAD_token, smoothing=0.1, dim=-1)
 
     bind_model(model, optimizer)
 
@@ -423,6 +425,26 @@ def main():
             best_cer = eval_cer
 
         scheduler.step()
+
+
+class LabelSmoothingLoss(nn.Module):
+    def __init__(self, classes, ignore_index, smoothing=0.1, dim=-1):
+        super(LabelSmoothingLoss, self).__init__()
+        self.confidence = 1.0 - smoothing
+        self.smoothing = smoothing
+        self.cls = classes
+        self.dim = dim
+        self.ignore_index = ignore_index
+
+    def forward(self, pred, target):
+        # pred = ((batch * seq_len) , vocab)
+        # target = ((batch * seq_len))
+        with torch.no_grad():
+            true_dist = torch.zeros_like(pred)
+            true_dist.fill_(self.smoothing / (self.cls - 1))
+            true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
+            true_dist[target == self.ignore_index, :] = 0
+        return torch.sum(-true_dist * pred)
 
 
 if __name__ == "__main__":
