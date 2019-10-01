@@ -222,11 +222,6 @@ def evaluate(model, dataloader, queue, criterion, device):
     return total_loss / total_num, total_dist / total_length
 
 def bind_model(model, optimizer=None):
-    melspectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=SAMPLE_RATE, n_fft=N_FFT,
-                                                          hop_length=HOP_LENGTH, window_fn=WINDOW_FUNCTION,
-                                                          n_mels=MEL_FILTERS, f_max=F_MAX)
-    amplitude_to_DB = torchaudio.transforms.AmplitudeToDB(stype='power', top_db=80)
-
     def load(filename, **kwargs):
         state = torch.load(os.path.join(filename, 'model.pt'))
         model.load_state_dict(state['model'])
@@ -245,7 +240,7 @@ def bind_model(model, optimizer=None):
         model.eval()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        input = get_log_melspectrogram_feature(wav_path, melspectrogram, amplitude_to_DB).unsqueeze(0)
+        input = get_log_melspectrogram_feature(wav_path).unsqueeze(0)
         input = input.to(device)
 
         logit = model(input_variable=input, input_lengths=None, teacher_forcing_ratio=0)
@@ -352,7 +347,7 @@ def main():
     model = nn.DataParallel(model).to(device)
 
     optimizer = optim.Adam(model.module.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[25, 40], gamma=0.5)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[17, 25, 33, 40, 45], gamma=0.5)
     criterion = LabelSmoothingLoss(vocab_size, ignore_index=PAD_token, smoothing=0.1, dim=-1)
 
     bind_model(model, optimizer)

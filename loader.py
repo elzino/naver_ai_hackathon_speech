@@ -28,7 +28,6 @@ import logging
 from torch.utils.data import Dataset, DataLoader
 import librosa
 import numpy as np
-import torchaudio
 
 from specaugment import spec_augment
 
@@ -88,23 +87,26 @@ def get_spectrogram_feature(filepath):
     return feat
 
 
-def get_log_melspectrogram_feature(filepath, melspectrogram, amplitude_to_db):
-    sig, rate = torchaudio.load_wav(filepath)  # C * time
-
-    S = melspectrogram(sig)  # C * n_mels * time
-    S = amplitude_to_db(S)  # C * n_mels * time
-    S = S.detach().numpy()
-    S = torch.FloatTensor(S)
-    feat = S.squeeze(0).transpose(0, 1)  # time * n_mels
-    feat -= feat.mean()
-
-    return feat  # time * n_mels
+def get_log_melspectrogram_feature(filepath, n_fft=N_FFT, hop_length=HOP_LENGTH, window='hamming',
+                                   n_mels=MEL_FILTERS, fmax=F_MAX):
+    audio, sr = librosa.load(filepath, sr=None)
+    S = librosa.feature.melspectrogram(y=audio, sr=sr, n_fft=n_fft, hop_length=hop_length, window=window, n_mels=n_mels,
+                                       fmax=fmax)
+    S = librosa.power_to_db(S)
+    feat = torch.FloatTensor(S).transpose(0, 1)  # time * melFilter
+    feat -= feat.mean()  # mean = 0 로 normalize
+    return feat  # time * melFilter
 
 
-def get_augmented_log_melspectrogram(filepath, melspectrogram, amplitude_to_DB):
-    mel_spectrogram = get_log_melspectrogram_feature(filepath, melspectrogram, amplitude_to_DB)
-    augmented_feat = spec_augment(mel_spectrogram, TIME_WARPING, FREQUENCY_MASKING, TIME_MASKING,
-                                  FREQUENCY_MASKING_NUM, TIME_MASKING_NUM)
+def get_augmented_log_melspectrogram(filepath, n_fft=N_FFT, hop_length=HOP_LENGTH, window='hamming',
+                                     n_mels=MEL_FILTERS, fmax=F_MAX, time_warping_para=TIME_WARPING,
+                                     frequency_masking_para=FREQUENCY_MASKING, time_masking_para=TIME_MASKING,
+                                     frequency_mask_num=FREQUENCY_MASKING_NUM, time_mask_num=TIME_MASKING_NUM):
+
+    mel_spectrogram = get_log_melspectrogram_feature(filepath, n_fft, hop_length, window, n_mels, fmax)
+    augmented_feat = spec_augment(mel_spectrogram, time_warping_para, frequency_masking_para, time_masking_para,
+                                  frequency_mask_num, time_mask_num)
+
     return augmented_feat  # time * mel_filter
 
 
@@ -131,10 +133,6 @@ class BaseDataset(Dataset):
         self.wav_paths = wav_paths
         self.script_paths = script_paths
         self.bos_id, self.eos_id = bos_id, eos_id
-        self.melspectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=SAMPLE_RATE, n_fft=N_FFT,
-                                                                   hop_length=HOP_LENGTH, window_fn=WINDOW_FUNCTION,
-                                                                   n_mels=MEL_FILTERS, f_max=F_MAX)
-        self.amplitude_to_DB = torchaudio.transforms.AmplitudeToDB(stype='power', top_db=80)
         if train:
             self.get_feature = get_augmented_log_melspectrogram
         else:
@@ -147,12 +145,12 @@ class BaseDataset(Dataset):
         return len(self.wav_paths)
 
     def getitem(self, idx):
-        feat = self.get_feature(self.wav_paths[idx], self.melspectrogram, self.amplitude_to_DB)
+        feat = self.get_feature(self.wav_paths[idx])
         script = get_script(self.script_paths[idx], self.bos_id, self.eos_id)
         return feat, script
 
     def __del__(self):
-        del self.melspectrogram, self.amplitude_to_DB, self.get_feature
+        del self.get_feature
 
 
 def _collate_fn(batch):
