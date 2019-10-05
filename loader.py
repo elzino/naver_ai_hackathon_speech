@@ -116,7 +116,9 @@ def get_script(filepath, bos_id, eos_id):
     result.append(bos_id)
     for i in range(len(tokens)):
         if len(tokens[i]) > 0:
-            result.append(int(tokens[i]))
+            token_int = int(tokens[i])
+            if token_int not in [65,132,200, 306, 435, 488, 722]:                     # data 전처리 65: ), 132: (, 200: ^, 306: ', 435: >,  488: /, 722: ㄴ, 
+                result.append(int(tokens[i]))
     result.append(eos_id)
     return result
 
