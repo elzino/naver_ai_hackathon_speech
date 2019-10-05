@@ -26,6 +26,7 @@ import torchaudio
 import label_loader
 from loader import *
 from models.listen_attend_and_spell import ListenRNN, Seq2seq, AttendSpellRNN
+from RAdam import RAdam
 
 import nsml
 from nsml import GPU_NUM, DATASET_PATH, DATASET_NAME, HAS_DATASET
@@ -293,10 +294,10 @@ def main():
     global PAD_token
 
     parser = argparse.ArgumentParser(description='Speech hackathon Baseline')
-    parser.add_argument('--hidden_size', type=int, default=512, help='hidden size of model (default: 512)')
+    parser.add_argument('--hidden_size', type=int, default=256, help='hidden size of model (default: 256)')
     parser.add_argument('--embedding_size', type=int, default=64, help=' size of embedding dimension (default: 64)')
-    parser.add_argument('--encoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
-    parser.add_argument('--decoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
+    parser.add_argument('--encoder_layer_size', type=int, default=4, help='number of layers of model (default: 4)')
+    parser.add_argument('--decoder_layer_size', type=int, default=2, help='number of layers of model (default: 2)')
     parser.add_argument('--dropout', type=float, default=0.2, help='dropout rate in training (default: 0.2)')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in training (default: 32)')
     parser.add_argument('--workers', type=int, default=4, help='number of workers in dataset loader (default: 4)')
@@ -347,7 +348,7 @@ def main():
     model = nn.DataParallel(model).to(device)
 
     optimizer = optim.Adam(model.module.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[17, 25, 33, 40, 45], gamma=0.5)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35, 45, 55], gamma=0.5)
     criterion = LabelSmoothingLoss(vocab_size, ignore_index=PAD_token, smoothing=0.1, dim=-1)
 
     bind_model(model, optimizer)
@@ -385,10 +386,6 @@ def main():
     train_begin = time.time()
 
     for epoch in range(begin_epoch, args.max_epochs):
-        if epoch == begin_epoch:
-            for group in optimizer.param_groups:
-                group['lr'] = 0
-
         train_queue = queue.Queue(args.workers * 2)
 
         train_loader = MultiLoader(train_dataset_list, train_queue, args.batch_size, args.workers)
