@@ -293,7 +293,7 @@ def main():
     global PAD_token
 
     parser = argparse.ArgumentParser(description='Speech hackathon Baseline')
-    parser.add_argument('--hidden_size', type=int, default=512, help='hidden size of model (default: 512)')
+    parser.add_argument('--hidden_size', type=int, default=256, help='hidden size of model (default: 256)')
     parser.add_argument('--embedding_size', type=int, default=64, help=' size of embedding dimension (default: 64)')
     parser.add_argument('--encoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
     parser.add_argument('--decoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
@@ -347,7 +347,7 @@ def main():
     model = nn.DataParallel(model).to(device)
 
     optimizer = optim.Adam(model.module.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[17, 25, 33, 40, 45], gamma=0.5)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35, 45], gamma=0.5)
     criterion = LabelSmoothingLoss(vocab_size, ignore_index=PAD_token, smoothing=0.1, dim=-1)
 
     bind_model(model, optimizer)
