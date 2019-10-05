@@ -22,7 +22,7 @@ class Beam(object):
             token indices, it may repeat.
     """
 
-    def __init__(self, size, pad, bos, eos,
+    def __init__(self, size, bos, eos,
                  n_best=1, cuda=False,
                  global_scorer=None,
                  min_length=0,

@@ -69,7 +69,7 @@ class AttendSpellRNN(nn.Module):
     BEAM_INDEX = 'beam_index'
     PROBABILITY = 'probability'
 
-    def __init__(self, vocab_size, max_len, hidden_size, pad_id, sos_id, eos_id, n_layers=2, rnn_cell='gru',
+    def __init__(self, vocab_size, max_len, hidden_size, sos_id, eos_id, n_layers=2, rnn_cell='gru',
                  embedding_size=512, input_dropout_p=0, dropout_p=0, beam_width=1, n_best=1, device='cpu'):
         super().__init__()
 
@@ -80,7 +80,6 @@ class AttendSpellRNN(nn.Module):
 
         self.eos_id = eos_id
         self.sos_id = sos_id
-        self.pad_id = pad_id
         self.init_input = None
         self.n_best = n_best
 
@@ -201,7 +200,7 @@ class AttendSpellRNN(nn.Module):
         else:
             bottom_hidden, upper_hidden = self._init_state_beam(encoder_hidden)
             beam = [
-                Beam(self.beam_width, self.pad_id, self.sos_id, self.eos_id, min_length=0, block_ngram_repeat=3, cuda=True)
+                Beam(self.beam_width, self.sos_id, self.eos_id, min_length=0, block_ngram_repeat=3, cuda=True)
                 for _ in range(batch_size)
             ]
 
