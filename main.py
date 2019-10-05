@@ -220,11 +220,6 @@ def evaluate(model, dataloader, queue, criterion, device):
     return total_loss / total_num, total_dist / total_length
 
 def bind_model(model, optimizer=None):
-    melspectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=SAMPLE_RATE, n_fft=N_FFT,
-                                                          hop_length=HOP_LENGTH, window_fn=WINDOW_FUNCTION,
-                                                          n_mels=MEL_FILTERS, f_max=F_MAX)
-    amplitude_to_DB = torchaudio.transforms.AmplitudeToDB(stype='power', top_db=80)
-
     def load(filename, **kwargs):
         state = torch.load(os.path.join(filename, 'model.pt'))
         model.load_state_dict(state['model'])
@@ -243,7 +238,7 @@ def bind_model(model, optimizer=None):
         model.eval()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        input = get_log_melspectrogram_feature(wav_path, melspectrogram, amplitude_to_DB).unsqueeze(0)
+        input = get_log_melspectrogram_feature(wav_path).unsqueeze(0)
         input = input.to(device)
 
         logit, y_hat = model(input_variable=input, input_lengths=None, teacher_forcing_ratio=0)
@@ -296,8 +291,8 @@ def main():
     global PAD_token
 
     parser = argparse.ArgumentParser(description='Speech hackathon Baseline')
-    parser.add_argument('--hidden_size', type=int, default=512, help='hidden size of model (default: 512)')
-    parser.add_argument('--embedding_size', type=int, default=512, help=' size of embedding dimension (default: 128)')
+    parser.add_argument('--hidden_size', type=int, default=256, help='hidden size of model (default: 256)')
+    parser.add_argument('--embedding_size', type=int, default=64, help=' size of embedding dimension (default: 64)')
     parser.add_argument('--encoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
     parser.add_argument('--decoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
     parser.add_argument('--dropout', type=float, default=0.2, help='dropout rate in training (default: 0.2)')
@@ -320,6 +315,8 @@ def main():
     EOS_token = char2index['</s>']
     PAD_token = char2index['_']
 
+    vocab_size = len(char2index)
+
     random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
@@ -334,7 +331,8 @@ def main():
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
                      n_layers=args.encoder_layer_size, rnn_cell='gru')
 
-    dec = AttendSpellRNN(len(char2index), args.max_len, args.hidden_size * 2, PAD_token,
+
+    dec = AttendSpellRNN(vocab_size, args.max_len, args.hidden_size * 2,
                      SOS_token, EOS_token,
                      n_layers=args.decoder_layer_size, rnn_cell='gru', embedding_size=args.embedding_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=4, device=device)
@@ -348,9 +346,9 @@ def main():
     model = nn.DataParallel(model).to(device)
 
     optimizer = optim.Adam(model.module.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 30, 40, 45], gamma=0.5)
-    criterion = nn.CrossEntropyLoss(reduction='sum', ignore_index=PAD_token).to(device)
 
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35, 45], gamma=0.5)
+    criterion = LabelSmoothingLoss(vocab_size, ignore_index=PAD_token, smoothing=0.1, dim=-1)
     bind_model(model, optimizer)
 
     if args.pause == 1:
@@ -417,6 +415,26 @@ def main():
             best_cer = eval_cer
 
         scheduler.step()
+
+
+class LabelSmoothingLoss(nn.Module):
+    def __init__(self, classes, ignore_index, smoothing=0.1, dim=-1):
+        super(LabelSmoothingLoss, self).__init__()
+        self.confidence = 1.0 - smoothing
+        self.smoothing = smoothing
+        self.cls = classes
+        self.dim = dim
+        self.ignore_index = ignore_index
+
+    def forward(self, pred, target):
+        # pred = ((batch * seq_len) , vocab)
+        # target = ((batch * seq_len))
+        with torch.no_grad():
+            true_dist = torch.zeros_like(pred)
+            true_dist.fill_(self.smoothing / (self.cls - 1))
+            true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
+            true_dist[target == self.ignore_index, :] = 0
+        return torch.sum(-true_dist * pred)
 
 
 if __name__ == "__main__":
