@@ -115,14 +115,18 @@ def get_script(filepath, bos_id, eos_id):
     script = target_dict[key]
     tokens = script.split(' ')
     result = list()
+    ban_list = [65, 132, 200, 306, 435, 488, 646, 662, 722, 745]
     result.append(bos_id)
     for i in range(len(tokens)):
         if len(tokens[i]) > 0:
             token_num = int(tokens[i])
-            if token_num not in [65, 132, 200, 306, 435, 488, 662, 722]:                     # data 전처리 65: ), 132: (, 200: ^, 306: ', 435: >,  488: /, 662: blank, 722: ㄴ, 
-                if token_num >= 663:
-                    token_num -= 1
-                result.append(token_num)
+            count = 0
+            if token_num not in ban_list:                      # data 전처리 65: ), 132: (, 200: ^, 306: ', 435: >,  488: /, 646: ;, 662: blank, 722: ㄴ,  745: \
+                for i in range(0, len(ban_list)) : 
+                    if ban_list[i] > token_num : 
+                        break
+                    count += 1
+                result.append(token_num-count)
     result.append(eos_id)
     return result
 

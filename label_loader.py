@@ -19,22 +19,24 @@ limitations under the License.
 def load_label(label_path):
     char2index = dict() # [ch] = id
     index2char = dict() # [id] = ch
+    ban_list = [65, 132, 200, 306, 435, 488, 646, 662, 722, 745]
     with open(label_path, 'r') as f:
-        for no, line in enumerate(f):
+        for _, line in enumerate(f):
             if line[0] == '#': 
                 continue
 
-            index, char, freq = line.strip().split('\t')
+            index, char, _ = line.strip().split('\t')
             char = char.strip()
-            if len(char) == 0:
-                char = ' '
-                continue
 
             index_num = int(index)
-
-            if index_num >= 663:
-                index_num -= 1
-
+            count = 0
+            if index_num in ban_list:       # data 전처리 65: ), 132: (, 200: ^, 306: ', 435: >,  488: /, 646: ;, 662: blank, 722: ㄴ,  745: \
+                continue            
+            for i in range(0, len(ban_list)) : 
+                if ban_list[i] > index_num : 
+                    break
+                count += 1
+            index_num -= count
             char2index[char] = index_num
             index2char[index_num] = char
 
