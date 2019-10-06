@@ -181,16 +181,18 @@ class AttendSpellRNN(nn.Module):
             return None
         if isinstance(encoder_hidden, tuple):
             encoder_hidden = tuple([self._cat_directions(h) for h in encoder_hidden])
+            bottom_hidden = (encoder_hidden[0][-self.n_layers, :, :].unsqueeze(0), encoder_hidden[1][-self.n_layers, :, :].unsqueeze(0))
+            upper_hidden = (encoder_hidden[0][(-self.n_layers + 1):, :, :], encoder_hidden[1][(-self.n_layers + 1):, :, :])
         else:
             encoder_hidden = self._cat_directions(encoder_hidden)
-        bottom_hidden = encoder_hidden[-self.n_layers, :, :].unsqueeze(0)
-        upper_hidden = encoder_hidden[(-self.n_layers + 1):, :, :]
+            bottom_hidden = encoder_hidden[-self.n_layers, :, :].unsqueeze(0)
+            upper_hidden = encoder_hidden[(-self.n_layers + 1):, :, :]
         return bottom_hidden, upper_hidden
 
     def _init_state_zero(self, batch_size):
         bottom_init = torch.zeros(1, batch_size, self.hidden_size).to(self.device)
         upper_init = torch.zeros(self.n_layers - 1, batch_size, self.hidden_size).to(self.device)
-        return bottom_init, upper_init
+        return (bottom_init, bottom_init), (upper_init, upper_init)
 
     def _cat_directions(self, h):
         """

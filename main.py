@@ -331,11 +331,11 @@ def main():
 
     enc = ListenRNN(feature_size, args.hidden_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
-                     n_layers=args.encoder_layer_size, rnn_cell='gru')
+                     n_layers=args.encoder_layer_size, rnn_cell='lstm')
 
     dec = AttendSpellRNN(vocab_size, args.max_len, args.hidden_size * 2,
                      SOS_token, EOS_token,
-                     n_layers=args.decoder_layer_size, rnn_cell='gru', embedding_size=args.embedding_size,
+                     n_layers=args.decoder_layer_size, rnn_cell='lstm', embedding_size=args.embedding_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=1, device=device)
 
     model = Seq2seq(enc, dec)
@@ -347,7 +347,7 @@ def main():
     model = nn.DataParallel(model).to(device)
 
     optimizer = optim.Adam(model.module.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35, 45], gamma=0.5)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35, 45, 55], gamma=0.5)
     criterion = LabelSmoothingLoss(vocab_size, ignore_index=PAD_token, smoothing=0.1, dim=-1)
 
     bind_model(model, optimizer)
