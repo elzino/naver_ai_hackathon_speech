@@ -30,6 +30,7 @@ import librosa
 import numpy as np
 
 from specaugment import spec_augment
+from label_loader import original2index
 
 logger = logging.getLogger('root')
 FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
@@ -119,11 +120,10 @@ def get_script(filepath, bos_id, eos_id):
     for i in range(len(tokens)):
         if len(tokens[i]) > 0:
             token_num = int(tokens[i])
-            if token_num == 662:
+            index = original2index[token_num]
+            if index == -1:
                 continue
-            elif token_num >= 663:
-                token_num -= 1
-            result.append(token_num)
+            result.append(index)
     result.append(eos_id)
     return result
 
