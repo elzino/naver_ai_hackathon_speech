@@ -121,7 +121,6 @@ def train(model, total_batch_size, queue, criterion, optimizer, device, train_be
         if lr_warm_up:
             step += 1
             for group in optimizer.param_groups:
-                print(group['lr'])
                 group['lr'] = lr * 0.001 * min(1000, step)
 
 
@@ -132,11 +131,10 @@ def train(model, total_batch_size, queue, criterion, optimizer, device, train_be
         target = scripts[:, 1:]
 
         model.module.flatten_parameters()
-        logit = model(feats, feat_lengths, scripts, teacher_forcing_ratio=teacher_forcing_ratio)
-
+        logit, y_hat = model(feats, feat_lengths, scripts, teacher_forcing_ratio=teacher_forcing_ratio)
         logit = torch.stack(logit, dim=1).to(device)  # batch x seq_len x vocab_size
 
-        y_hat = logit.max(-1)[1]
+        # y_hat = logit.max(-1)[1]
 
         loss = criterion(logit.contiguous().view(-1, logit.size(-1)), target.contiguous().view(-1))
         total_loss += loss.item()
@@ -203,10 +201,10 @@ def evaluate(model, dataloader, queue, criterion, device):
             target = scripts[:, 1:]
 
             model.module.flatten_parameters()
-            logit = model(feats, feat_lengths, scripts, teacher_forcing_ratio=0.0)
+            logit, y_hat = model(feats, feat_lengths, scripts, teacher_forcing_ratio=0.0)
 
             logit = torch.stack(logit, dim=1).to(device)  # batch x seq_len x vocab_size
-            y_hat = logit.max(-1)[1]
+            # y_hat = logit.max(-1)[1]
 
             loss = criterion(logit.contiguous().view(-1, logit.size(-1)), target.contiguous().view(-1))
             total_loss += loss.item()
@@ -243,10 +241,10 @@ def bind_model(model, optimizer=None):
         input = get_log_melspectrogram_feature(wav_path).unsqueeze(0)
         input = input.to(device)
 
-        logit = model(input_variable=input, input_lengths=None, teacher_forcing_ratio=0)
+        logit, y_hat = model(input_variable=input, input_lengths=None, teacher_forcing_ratio=0)
         logit = torch.stack(logit, dim=1).to(device)
 
-        y_hat = logit.max(-1)[1]
+        # y_hat = logit.max(-1)[1]
         hyp = label_to_string(y_hat)
 
         return hyp[0]
@@ -333,10 +331,11 @@ def main():
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
                      n_layers=args.encoder_layer_size, rnn_cell='gru')
 
+
     dec = AttendSpellRNN(vocab_size, args.max_len, args.hidden_size * 2,
                      SOS_token, EOS_token,
                      n_layers=args.decoder_layer_size, rnn_cell='gru', embedding_size=args.embedding_size,
-                     input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=1, device=device)
+                     input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=4, device=device)
 
     model = Seq2seq(enc, dec)
     model.flatten_parameters()
@@ -347,9 +346,9 @@ def main():
     model = nn.DataParallel(model).to(device)
 
     optimizer = optim.Adam(model.module.parameters(), lr=args.lr)
+
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35, 45], gamma=0.5)
     criterion = LabelSmoothingLoss(vocab_size, ignore_index=PAD_token, smoothing=0.1, dim=-1)
-
     bind_model(model, optimizer)
 
     if args.pause == 1:
@@ -385,10 +384,6 @@ def main():
     train_begin = time.time()
 
     for epoch in range(begin_epoch, args.max_epochs):
-        if epoch == begin_epoch:
-            for group in optimizer.param_groups:
-                group['lr'] = 0
-
         train_queue = queue.Queue(args.workers * 2)
 
         train_loader = MultiLoader(train_dataset_list, train_queue, args.batch_size, args.workers)

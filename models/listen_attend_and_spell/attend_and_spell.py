@@ -24,7 +24,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .attention import Attention
-
+from .beam_search import Beam
 
 class AttendSpellRNN(nn.Module):
     r"""
@@ -66,9 +66,11 @@ class AttendSpellRNN(nn.Module):
     KEY_ATTN_SCORE = 'attention_score'
     KEY_LENGTH = 'length'
     KEY_SEQUENCE = 'sequence'
+    BEAM_INDEX = 'beam_index'
+    PROBABILITY = 'probability'
 
     def __init__(self, vocab_size, max_len, hidden_size, sos_id, eos_id, n_layers=2, rnn_cell='gru',
-                 embedding_size=512, input_dropout_p=0, dropout_p=0, beam_width=1, device='cpu'):
+                 embedding_size=512, input_dropout_p=0, dropout_p=0, beam_width=1, n_best=1, device='cpu'):
         super().__init__()
 
         self.device = device
@@ -78,8 +80,8 @@ class AttendSpellRNN(nn.Module):
 
         self.eos_id = eos_id
         self.sos_id = sos_id
-
         self.init_input = None
+        self.n_best = n_best
 
         self.n_layers = n_layers
         self.beam_width = beam_width
@@ -126,13 +128,42 @@ class AttendSpellRNN(nn.Module):
 
         return predicted_prob, bottom_hidden, upper_hidden, attn
 
+    def forward_step_beam(self, input_var, last_bottom_hidden, last_upper_hidden, encoder_outputs, function):
+        # input_var = [list of int] = [B]
+        # last_~~~_hidden = [layer x B x hidden_size]
+        # encoder_outputs = [B x max_len x hidden_dim]
+
+        embedded = self.embedding(input_var)
+        embedded = self.input_dropout(embedded).unsqueeze(1)  # B x 1 x H
+
+        batch_size, encoder_length, encoder_hidden_dim = encoder_outputs.size()
+        encoder_outputs = encoder_outputs.repeat(self.beam_width, 1, 1)
+        encoder_outputs = encoder_outputs.view(self.beam_width, batch_size, encoder_length, encoder_hidden_dim)
+        encoder_outputs = encoder_outputs.transpose(0, 1)
+        encoder_outputs = encoder_outputs.reshape(self.beam_width * batch_size, encoder_length, encoder_hidden_dim)
+
+        #  if self.training:
+        self.bottom_rnn.flatten_parameters()
+        self.upper_rnn.flatten_parameters()
+
+        attn = self.attention(encoder_outputs, last_bottom_hidden)  # (batch, max_len)
+        context = attn.unsqueeze(1).bmm(encoder_outputs)  # B x 1 x H
+        x = torch.cat([embedded, context], 2)  # B x 1 x (2 * H)
+
+        x, bottom_hidden = self.bottom_rnn(x, last_bottom_hidden)
+        x, upper_hidden = self.upper_rnn(x, last_upper_hidden)  # B x 1 x H
+        predicted_prob = function(self.out(x.squeeze(1)), dim=-1)  # B x vocab_size
+
+        return predicted_prob, bottom_hidden, upper_hidden, attn
+
     def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None, function=F.log_softmax, teacher_forcing_ratio=0):
         ret_dict = dict()
         ret_dict[AttendSpellRNN.KEY_ATTN_SCORE] = list()
+        ret_dict[AttendSpellRNN.BEAM_INDEX] = list()
+        ret_dict[AttendSpellRNN.KEY_SEQUENCE] = list()
+        ret_dict[AttendSpellRNN.PROBABILITY] = list()
 
         inputs, batch_size, max_length = self._validate_args(inputs, encoder_outputs, teacher_forcing_ratio)
-        bottom_hidden, upper_hidden = self._init_state_zero(batch_size)
-
         use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
 
         decoder_outputs = []
@@ -156,24 +187,80 @@ class AttendSpellRNN(nn.Module):
         # Manual unrolling is used to support random teacher forcing.
         # If teacher_forcing_ratio is True or False instead of a probability, the unrolling can be done in graph
         if use_teacher_forcing:
+            bottom_hidden, upper_hidden = self._init_state(encoder_hidden)
             decoder_input = inputs[:, :-1]
             for di in range(max_length):
                 decoder_output, bottom_hidden, upper_hidden, attn \
                     = self.forward_step(decoder_input[:, di], bottom_hidden, upper_hidden, encoder_outputs, function)
                 decode(di, decoder_output, attn)
+            ret_dict[AttendSpellRNN.KEY_SEQUENCE] = sequence_symbols
+            ret_dict[AttendSpellRNN.KEY_LENGTH] = lengths.tolist()
+            decoder_outputs_temp = torch.stack(decoder_outputs, dim=1).to(self.device)  # batch x seq_len x vocab_size
+            hyps = decoder_outputs_temp.max(-1)[1]
         else:
-            decoder_input = inputs[:, 0]
-            for di in range(max_length):
-                decoder_output, bottom_hidden, upper_hidden, step_attn \
-                    = self.forward_step(decoder_input, bottom_hidden, upper_hidden, encoder_outputs, function)
-                symbols = decode(di, decoder_output, step_attn)  # batch x 1
-                decoder_input = symbols.squeeze(1)
+            bottom_hidden, upper_hidden = self._init_state_beam(encoder_hidden)
+            beam = [
+                Beam(self.beam_width, self.sos_id, self.eos_id, min_length=0, block_ngram_repeat=3, cuda=True)
+                for _ in range(batch_size)
+            ]
 
-        ret_dict[AttendSpellRNN.KEY_SEQUENCE] = sequence_symbols
-        ret_dict[AttendSpellRNN.KEY_LENGTH] = lengths.tolist()
+            for di in range(max_length):
+                if all((b.done for b in beam)):
+                    break
+
+                # (a) Construct batch x beam_size nxt words.
+                # Get all the pending current beam words and arrange for forward.
+
+                decoder_input = torch.stack([b.current_predictions for b in beam]).to(self.device)
+                decoder_input = decoder_input.view(-1)
+                decoder_output, bottom_hidden, upper_hidden, step_attn \
+                    = self.forward_step_beam(decoder_input, bottom_hidden, upper_hidden, encoder_outputs, function)
+                decoder_output = decoder_output.view(batch_size, self.beam_width, -1)
+                step_attn = step_attn.view(batch_size, self.beam_width, -1)
+
+                select_indices_array = []
+                # Loop over the batch_size number of beam
+                for j, b in enumerate(beam):
+                    if not b.done:
+                        b.advance(decoder_output[j, :],
+                                    step_attn.data[j, :, :])
+                    select_indices_array.append(
+                            list(map(lambda x: x + j * self.beam_width, b.current_origin))
+                    )
+                select_indices = torch.tensor(select_indices_array, dtype = torch.int64).view(-1).to(self.device)
+                bottom_hidden, upper_hidden = self._select_indices_hidden(select_indices, bottom_hidden, upper_hidden)
+
+            for b in beam:
+                scores, ks = b.sort_finished(minimum=self.n_best)
+                hyps, attn, beam_indexes, probs = [], [], [], []
+                for times, k in ks[:self.n_best]:
+                    hyp, att, beam_index, prob = b.get_hyp(times, k)
+                    hyps.append(hyp)
+                    attn.append(att)
+                    beam_indexes.append(beam_index)
+                    probs.append(prob)
+
+                probs = torch.stack(probs[0])
+                probs = b.fill_empty_sequence(probs, max_length)      # make length max_length of sequence
+                hyps = torch.stack(hyps[0])
+                hyps = b.fill_empty_sequence(hyps , max_length)
+
+                ret_dict[AttendSpellRNN.PROBABILITY].append(probs)
+                ret_dict[AttendSpellRNN.BEAM_INDEX].append(beam_indexes)
+                ret_dict[AttendSpellRNN.KEY_SEQUENCE].append(hyps)
+                ret_dict[AttendSpellRNN.KEY_ATTN_SCORE].append(attn)
+
+            hyps = torch.stack(ret_dict[AttendSpellRNN.KEY_SEQUENCE])
+            probs = torch.stack(ret_dict[AttendSpellRNN.PROBABILITY])
+            probs = torch.transpose(probs, 0, 1)
+            for i in range(probs.size(0)):
+                decoder_outputs.append(probs[i])
 
         # decoder_outputs = [seq_len, batch, vocab_size]
-        return decoder_outputs, bottom_hidden, upper_hidden, ret_dict
+        return decoder_outputs, hyps, bottom_hidden, upper_hidden
+
+    def _select_indices_hidden(self, select_indices, bottom_hidden, upper_hidden):
+        return torch.index_select(bottom_hidden, 1, select_indices), torch.index_select(upper_hidden, 1, select_indices)
 
     def _init_state(self, encoder_hidden):
         """ Initialize the encoder hidden state. """
@@ -185,6 +272,31 @@ class AttendSpellRNN(nn.Module):
             encoder_hidden = self._cat_directions(encoder_hidden)
         bottom_hidden = encoder_hidden[-self.n_layers, :, :].unsqueeze(0)
         upper_hidden = encoder_hidden[(-self.n_layers + 1):, :, :]
+        return bottom_hidden, upper_hidden
+
+    def _init_state_beam(self, encoder_hidden):
+        """
+            Initialize the encoder hidden state.
+            encoder_hidden : [layer x B x hidden_size]
+        """
+        if encoder_hidden is None:
+            return None
+        if isinstance(encoder_hidden, tuple):
+            encoder_hidden = tuple([self._cat_directions(h) for h in encoder_hidden])
+        else:
+            encoder_hidden = self._cat_directions(encoder_hidden)
+
+        _, batch_size, hidden_size = encoder_hidden.size()
+        bottom_hidden = encoder_hidden[-self.n_layers, :, :].unsqueeze(0)  # make beam * batch to batch * beam
+        bottom_hidden = bottom_hidden.repeat(1, self.beam_width,1)
+        bottom_hidden = bottom_hidden.view(1, self.beam_width, batch_size, hidden_size)
+        bottom_hidden = torch.transpose(bottom_hidden, 1, 2).reshape(1, self.beam_width * batch_size, hidden_size)
+
+        upper_hidden = encoder_hidden[(-self.n_layers + 1):, :, :]
+        upper_hidden = upper_hidden.repeat(1, self.beam_width, 1)
+        upper_hidden = upper_hidden.view(self.n_layers - 1, self.beam_width, batch_size, hidden_size)
+        upper_hidden = torch.transpose(upper_hidden, 1, 2).reshape(self.n_layers - 1, self.beam_width * batch_size, hidden_size)
+
         return bottom_hidden, upper_hidden
 
     def _init_state_zero(self, batch_size):

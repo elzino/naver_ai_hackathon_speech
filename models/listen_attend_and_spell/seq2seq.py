@@ -78,4 +78,4 @@ class Seq2seq(nn.Module):
 
         # decoder_outputs, decoder_hidden, ret_dict
         # ret_dict = {KEY_ATTN_SCORE:~, KEY_LENGTH:~, KEY_SEQUENCE:~}
-        return result[0]
+        return result[0], result[1]
