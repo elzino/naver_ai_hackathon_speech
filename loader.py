@@ -108,7 +108,7 @@ def load_targets(path):
     # (이벤트세트메뉴) 할인되나요? -> 이번달에 (이벤트세트메뉴) 할인되나요?
     list_132_insert = ["43_0523_852_0_05654_03"]
     # 이 610 번 469 달 631 에 625
-    insert_str = "610 469 631 625"
+    insert_str = "610 469 631 625 "
 
     with open(path, 'r') as f:
         for no, line in enumerate(f):
@@ -116,11 +116,11 @@ def load_targets(path):
             if key in list_285:
                 target = target.replace("285 ", "")
             elif key in list_132_delete:
-                start_ind = target.find("135")
+                start_ind = target.find("132")
                 end_ind = target.find("65") + 3
                 target = target[:start_ind] + target[end_ind:]
             elif key in list_132_rain:
-                start_ind = target.find("135")
+                start_ind = target.find("132")
                 end_ind = target.find("65") + 3
                 target = target[:start_ind] + rain_str + target[end_ind:]
             elif key in list_132_insert:
