@@ -187,7 +187,7 @@ class AttendSpellRNN(nn.Module):
         # Manual unrolling is used to support random teacher forcing.
         # If teacher_forcing_ratio is True or False instead of a probability, the unrolling can be done in graph
         if use_teacher_forcing:
-            bottom_hidden, upper_hidden = self._init_state(encoder_hidden)
+            bottom_hidden, upper_hidden = self._init_state_zero(batch_size)
             decoder_input = inputs[:, :-1]
             for di in range(max_length):
                 decoder_output, bottom_hidden, upper_hidden, attn \
@@ -198,7 +198,7 @@ class AttendSpellRNN(nn.Module):
             decoder_outputs_temp = torch.stack(decoder_outputs, dim=1).to(self.device)  # batch x seq_len x vocab_size
             hyps = decoder_outputs_temp.max(-1)[1]
         else:
-            bottom_hidden, upper_hidden = self._init_state_beam(encoder_hidden)
+            bottom_hidden, upper_hidden = self._init_state_zero_beam(batch_size, self.beam_width)
             beam = [
                 Beam(self.beam_width, self.sos_id, self.eos_id, cuda=True)
                 for _ in range(batch_size)
@@ -304,6 +304,10 @@ class AttendSpellRNN(nn.Module):
         upper_init = torch.zeros(self.n_layers - 1, batch_size, self.hidden_size).to(self.device)
         return bottom_init, upper_init
 
+    def _init_state_zero_beam(self, batch_size, beam_width):
+        bottom_init = torch.zeros(1, batch_size*beam_width, self.hidden_size).to(self.device)
+        upper_init = torch.zeros(self.n_layers - 1, batch_size*beam_width, self.hidden_size).to(self.device)
+        return bottom_init, upper_init
     def _cat_directions(self, h):
         """
             (#directions * #layers, #batch, hidden_size) -> (#layers, #batch, #directions * hidden_size)
