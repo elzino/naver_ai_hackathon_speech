@@ -124,6 +124,7 @@ def get_script(filepath, bos_id, eos_id):
             elif token_num >= 663:
                 token_num -= 1
             result.append(token_num)
+
     result.append(eos_id)
     return result
 
