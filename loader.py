@@ -30,6 +30,7 @@ import librosa
 import numpy as np
 
 from specaugment import spec_augment
+from label_loader import original2index
 
 logger = logging.getLogger('root')
 FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
@@ -58,9 +59,72 @@ target_dict = dict()
 
 
 def load_targets(path):
+    # 285 :
+    # 혹시 제가 간 날 계산하셨던 분과 통화연결 가능할까요?:
+    list_285 = ["42_0606_317_1_00981_06",
+                "42_0609_317_0_01546_06",
+                "42_0610_317_0_03857_06",
+                "43_0607_317_0_05775_06",
+                "44_0602_317_0_05120_06",
+                "41_0518_317_0_09132_06",
+                "41_0527_317_0_09230_06",
+                "41_0603_317_0_09924_06",
+                "42_0513_317_0_00139_06",
+                "42_0606_317_1_00981_06",
+                "42_0609_317_0_01546_06",
+                "42_0610_317_0_03857_06",
+                "43_0607_317_0_05775_06",
+                "44_0602_317_0_05120_06", ]
+
+    # 132 (, 65 )
+    # 괄호안 내용 삭제
+    list_132_delete = ["41_0513_794_0_07198_05",
+                       "41_0517_850_1_08683_03",
+                       "41_0601_801_0_08009_08",
+                       "41_0606_800_0_07590_05",
+                       "41_0606_802_0_07786_07",
+                       "41_0606_802_1_07787_00",
+                       "41_0606_802_1_07787_07",
+                       "41_0608_796_0_07569_01",
+                       "41_0610_795_2_10208_06",
+                       "41_0610_796_0_09972_01",
+                       "42_0527_802_0_02450_07",
+                       "42_0528_802_0_01815_07",
+                       "42_0528_869_0_01811_03",
+                       "42_0602_796_0_02809_01",
+                       "42_0610_869_0_03544_03",
+                       "44_0530_805_0_04538_06",
+                       "44_0606_869_0_04208_03",
+                       "41_0513_796_0_07174_01", ]
+
+    # 132 (, 65 )
+    # (특정 상황)에 -> 비오는날에
+    list_132_rain = ["41_0606_802_0_07786_09",
+                     "42_0520_802_0_02549_09"]
+    # 비 513 오 574 는 784 날 706 에 625
+    rain_str = "513 574 784 706 625 "
+
+    # 132 (, 65 )
+    # (이벤트세트메뉴) 할인되나요? -> 이번달에 (이벤트세트메뉴) 할인되나요?
+    list_132_insert = ["43_0523_852_0_05654_03"]
+    # 이 610 번 469 달 631 에 625
+    insert_str = "610 469 631 625 "
+
     with open(path, 'r') as f:
         for no, line in enumerate(f):
             key, target = line.strip().split(',')
+            if key in list_285:
+                target = target.replace("285 ", "")
+            elif key in list_132_delete:
+                start_ind = target.find("132")
+                end_ind = target.find("65") + 3
+                target = target[:start_ind] + target[end_ind:]
+            elif key in list_132_rain:
+                start_ind = target.find("132")
+                end_ind = target.find("65") + 3
+                target = target[:start_ind] + rain_str + target[end_ind:]
+            elif key in list_132_insert:
+                target = insert_str + target
             target_dict[key] = target
 
 
@@ -119,12 +183,10 @@ def get_script(filepath, bos_id, eos_id):
     for i in range(len(tokens)):
         if len(tokens[i]) > 0:
             token_num = int(tokens[i])
-            if token_num == 662:
+            index = original2index[token_num]
+            if index == -1:
                 continue
-            elif token_num >= 663:
-                token_num -= 1
-            result.append(token_num)
-
+            result.append(index)
     result.append(eos_id)
     return result
 
