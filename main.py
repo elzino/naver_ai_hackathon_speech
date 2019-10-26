@@ -294,7 +294,7 @@ def main():
     parser = argparse.ArgumentParser(description='Speech hackathon Baseline')
     parser.add_argument('--hidden_size', type=int, default=256, help='hidden size of model (default: 256)')
     parser.add_argument('--embedding_size', type=int, default=64, help=' size of embedding dimension (default: 64)')
-    parser.add_argument('--encoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
+    parser.add_argument('--encoder_layer_size', type=int, default=4, help='number of layers of model (default: 4)')
     parser.add_argument('--decoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
     parser.add_argument('--dropout', type=float, default=0.2, help='dropout rate in training (default: 0.2)')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in training (default: 32)')
