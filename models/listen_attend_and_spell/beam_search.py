@@ -101,7 +101,7 @@ class Beam(object):
         for i in range(self.next_ys[-1].size(0)):
             if self.next_ys[-1][i] == self._eos:
                 length = len(self.next_ys) - 1
-                score = self.scores[i] / pow(length, 0.7)
+                score = self.scores[i]  # / pow(length, 0.3)
                 self.finished.append((score, length, i))
 
         # End condition is when top-of-beam is EOS and no global score.
@@ -109,7 +109,7 @@ class Beam(object):
             self.all_scores.append(self.scores)
 
     def sort_finished(self):
-        self.finished = sorted(self.finished, key=lambda finished: finished[0])
+        self.finished = sorted(self.finished, key=lambda finished: finished[0], reverse=True)
         scores = [sc for sc, _, _ in self.finished]
         ks = [(t, k) for _, t, k in self.finished]
         return scores, ks
