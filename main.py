@@ -292,7 +292,7 @@ def main():
     parser = argparse.ArgumentParser(description='Speech hackathon Baseline')
     parser.add_argument('--hidden_size', type=int, default=256, help='hidden size of model (default: 256)')
     parser.add_argument('--embedding_size', type=int, default=64, help=' size of embedding dimension (default: 64)')
-    parser.add_argument('--encoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
+    parser.add_argument('--encoder_layer_size', type=int, default=4, help='number of layers of model (default: 3)')
     parser.add_argument('--decoder_layer_size', type=int, default=3, help='number of layers of model (default: 3)')
     parser.add_argument('--dropout', type=float, default=0.2, help='dropout rate in training (default: 0.2)')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in training (default: 32)')
@@ -334,7 +334,7 @@ def main():
     dec = AttendSpellRNN(vocab_size, args.max_len, args.hidden_size * 2,
                      SOS_token, EOS_token,
                      n_layers=args.decoder_layer_size, rnn_cell='gru', embedding_size=args.embedding_size,
-                     input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=8, device=device)
+                     input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=2, device=device)
 
     model = Seq2seq(enc, dec)
     model.flatten_parameters()
@@ -349,7 +349,7 @@ def main():
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35, 45], gamma=0.5)
     criterion = LabelSmoothingLoss(vocab_size, ignore_index=PAD_token, smoothing=0.1, dim=-1)
     bind_model(model, optimizer)
-    nsml.load(checkpoint='best0_04782551913281964', session='team39/sr-hack-2019-50000/1')
+    nsml.load(checkpoint='best0_046371283766131983', session='team39/sr-hack-2019-50000/33')
     nsml.save('saved')
     if args.pause == 1:
         nsml.paused(scope=locals())
@@ -439,7 +439,6 @@ class LabelSmoothingLoss(nn.Module):
             true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
             true_dist[target == self.ignore_index, :] = 0
         return torch.sum(-true_dist * pred)
-
 
 if __name__ == "__main__":
     main()

@@ -205,8 +205,8 @@ class AttendSpellRNN(nn.Module):
             ]
 
             for di in range(max_length):
-                if all((b.done for b in beam)):
-                    break
+                # if all((b.done for b in beam)):
+                #     break
 
                 # (a) Construct batch x beam_size nxt words.
                 # Get all the pending current beam words and arrange for forward.

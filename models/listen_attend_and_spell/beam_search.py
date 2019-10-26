@@ -103,7 +103,7 @@ class Beam(object):
 
         # Sum the previous scores.
         if len(self.prev_ks) > 0:
-            beam_scores = word_probs + self.scores.unsqueeze(1)
+            beam_scores = (word_probs + self.scores.unsqueeze(1)*(cur_len-1))/cur_len
             # Don't let EOS have children.
             for i in range(self.next_ys[-1].size(0)):
                 if self.next_ys[-1][i] == self._eos:
