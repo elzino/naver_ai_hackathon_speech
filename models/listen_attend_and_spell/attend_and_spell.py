@@ -70,7 +70,7 @@ class AttendSpellRNN(nn.Module):
     PROBABILITY = 'probability'
 
     def __init__(self, vocab_size, max_len, hidden_size, sos_id, eos_id, n_layers=2, rnn_cell='gru',
-                 embedding_size=512, input_dropout_p=0, dropout_p=0, beam_width=1, n_best=1, device='cpu'):
+                 embedding_size=512, input_dropout_p=0, dropout_p=0, beam_width=1, device='cpu'):
         super().__init__()
 
         self.device = device
@@ -81,7 +81,6 @@ class AttendSpellRNN(nn.Module):
         self.eos_id = eos_id
         self.sos_id = sos_id
         self.init_input = None
-        self.n_best = n_best
 
         self.n_layers = n_layers
         self.beam_width = beam_width
@@ -221,34 +220,25 @@ class AttendSpellRNN(nn.Module):
                 select_indices_array = []
                 # Loop over the batch_size number of beam
                 for j, b in enumerate(beam):
-                    if not b.done:
-                        b.advance(decoder_output[j, :],
-                                    step_attn.data[j, :, :])
+                    b.advance(decoder_output[j, :], step_attn.data[j, :, :])
                     select_indices_array.append(
                             list(map(lambda x: x + j * self.beam_width, b.current_origin))
                     )
-                select_indices = torch.tensor(select_indices_array, dtype = torch.int64).view(-1).to(self.device)
+                select_indices = torch.tensor(select_indices_array, dtype=torch.int64).view(-1).to(self.device)
                 bottom_hidden, upper_hidden = self._select_indices_hidden(select_indices, bottom_hidden, upper_hidden)
 
             for b in beam:
-                scores, ks = b.sort_finished(minimum=self.n_best)
-                hyps, attn, beam_indexes, probs = [], [], [], []
-                for times, k in ks[:self.n_best]:
-                    hyp, att, beam_index, prob = b.get_hyp(times, k)
-                    hyps.append(hyp)
-                    attn.append(att)
-                    beam_indexes.append(beam_index)
-                    probs.append(prob)
+                _, ks = b.sort_finished(minimum=self.n_best)
+                times, k = ks[0]
+                hyp, beam_index, prob = b.get_hyp(times, k)
 
-                probs = torch.stack(probs[0])
-                probs = b.fill_empty_sequence(probs, max_length)      # make length max_length of sequence
-                hyps = torch.stack(hyps[0])
-                hyps = b.fill_empty_sequence(hyps , max_length)
+                prob = torch.stack(prob)
+                prob = b.fill_empty_sequence(prob, max_length)      # make length max_length of sequence
+                hyp = torch.stack(hyp)
+                hyp = b.fill_empty_sequence(hyp, max_length)
 
-                ret_dict[AttendSpellRNN.PROBABILITY].append(probs)
-                ret_dict[AttendSpellRNN.BEAM_INDEX].append(beam_indexes)
-                ret_dict[AttendSpellRNN.KEY_SEQUENCE].append(hyps)
-                ret_dict[AttendSpellRNN.KEY_ATTN_SCORE].append(attn)
+                ret_dict[AttendSpellRNN.PROBABILITY].append(prob)
+                ret_dict[AttendSpellRNN.KEY_SEQUENCE].append(hyp)
 
             hyps = torch.stack(ret_dict[AttendSpellRNN.KEY_SEQUENCE])
             probs = torch.stack(ret_dict[AttendSpellRNN.PROBABILITY])
