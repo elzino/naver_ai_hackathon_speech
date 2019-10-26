@@ -337,37 +337,37 @@ def main():
     # second ensemble element
     enc.append(ListenRNN(feature_size, args.hidden_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
-                     n_layers=4, rnn_cell='gru'))
+                     n_layers=3, rnn_cell='gru'))
     dec.append(AttendSpellRNN(vocab_size, args.max_len, args.hidden_size * 2,
                      SOS_token, EOS_token,
                      n_layers=args.decoder_layer_size, rnn_cell='gru', embedding_size=args.embedding_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=1, device=device))
-    model = []
+    models = []
     optimizer = []
     scheduler = []
     criterion = []
     for index in range(len(enc)):
-        model.append(Seq2seq(enc[index], dec[index]))
-        model[index].flatten_parameters()
+        models.append(Seq2seq(enc[index], dec[index]))
+        models[index].flatten_parameters()
 
-        for param in model[index].parameters():
+        for param in models[index].parameters():
             param.data.uniform_(-0.1, 0.1)
 
-        model[index] = nn.DataParallel(model[index]).to(device)
+        models[index] = nn.DataParallel(models[index]).to(device)
 
-        optimizer.append(optim.Adam(model[index].module.parameters(), lr=args.lr))
+        optimizer.append(optim.Adam(models[index].module.parameters(), lr=args.lr))
         scheduler.append(optim.lr_scheduler.MultiStepLR(optimizer[index], milestones=[20, 35, 45], gamma=0.5))
         criterion.append(LabelSmoothingLoss(vocab_size, ignore_index=PAD_token, smoothing=0.1, dim=-1))
 
-        bind_model(model[index], optimizer[index])
+        bind_model(models[index], optimizer[index])
         if index == 0:
             nsml.load(checkpoint='best0_046371283766131983', session='team39/sr-hack-2019-50000/33')
-        elif index == 1:
-            nsml.load(checkpoint='best0_046371283766131983', session='team39/sr-hack-2019-50000/33')
+        elif index == 1:  
+            nsml.load(checkpoint='best0_04362819374052981', session='team39/sr-hack-2019-50000/31')
         
 
     
-    ensemble_model = Ensemble(model, vocab_size, args.max_len, device = device)
+    ensemble_model = Ensemble(models, vocab_size, args.max_len, device = device)
     bind_model(ensemble_model, optimizer[0])
     nsml.save('saved')
 

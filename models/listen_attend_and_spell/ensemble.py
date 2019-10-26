@@ -28,19 +28,20 @@ class Ensemble(nn.Module):
 
         Input: 4 models to get output
     """
-    def __init__(self,model, vocab_size, max_len, device='cpu'):
+    def __init__(self, models, vocab_size, max_len, device='cpu'):
         super(Ensemble, self).__init__()
         self.max_len = max_len
         self.vocab_size = vocab_size
-        self.model= model
+        self.models= models
+        for model in self.models:
+            model.eval()
         self.device = device
 
     def forward(self, input_variable, input_lengths=None, target_variable=None, teacher_forcing_ratio=0):
         x = torch.zeros(input_variable.size(0), self.max_len, self.vocab_size).to(self.device)
-        for model in self.model:
+        for model in self.models:
             output = model(input_variable)
             output = torch.stack(output, dim=1).to(self.device)
             x += output
-            # print(index,':',x[index])
         
         return x
