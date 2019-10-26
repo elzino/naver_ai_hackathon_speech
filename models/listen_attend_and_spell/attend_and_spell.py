@@ -228,7 +228,7 @@ class AttendSpellRNN(nn.Module):
                 bottom_hidden, upper_hidden = self._select_indices_hidden(select_indices, bottom_hidden, upper_hidden)
 
             for b in beam:
-                _, ks = b.sort_finished(minimum=self.n_best)
+                _, ks = b.sort_finished()
                 times, k = ks[0]
                 hyp, beam_index, prob = b.get_hyp(times, k)
 
