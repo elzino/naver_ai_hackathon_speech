@@ -27,7 +27,7 @@ class Attention(nn.Module):
         self.Ua = nn.Linear(hidden_dim, hidden_dim, bias=False)
         self.Va = nn.Linear(hidden_dim, 1, bias=False)
 
-    def forward(self, encoder_outputs, last_hiddens, seq_lens=None):
+    def forward(self, encoder_outputs, last_hidden, seq_lens=None):
         """
                 Inputs
                     encoder_outputs: (batch, max_len, hidden_dim)
@@ -39,7 +39,9 @@ class Attention(nn.Module):
 
         """
 
-        last_hidden = last_hiddens.transpose(0, 1)  # (batch, 1, hidden_dim)
+        if isinstance(last_hidden, tuple):
+            last_hidden = last_hidden[0]
+        last_hidden = last_hidden.transpose(0, 1)  # (batch, 1, hidden_dim)
         attention_energy = self.Va(torch.tanh(self.Wa(encoder_outputs) + self.Ua(last_hidden)))  # (batch, max_len, 1)
         attention_energy = attention_energy.squeeze(-1)  # (batch, max_len)
         #  attention_energy = self.mask_3d(attention_energy, seq_lens, -float('inf'))

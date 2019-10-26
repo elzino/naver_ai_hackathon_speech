@@ -121,7 +121,7 @@ def train(model, total_batch_size, queue, criterion, optimizer, device, train_be
             step += 1
             for group in optimizer.param_groups:
                 print(group['lr'])
-                group['lr'] = lr * 0.001 * min(1000, step)
+                group['lr'] = lr * 0.0005 * min(2000, step)
 
 
         feats = feats.to(device)
@@ -330,11 +330,11 @@ def main():
 
     enc = ListenRNN(feature_size, args.hidden_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
-                     n_layers=args.encoder_layer_size, rnn_cell='gru')
+                     n_layers=args.encoder_layer_size, rnn_cell='lstm')
 
     dec = AttendSpellRNN(vocab_size, args.max_len, args.hidden_size * 2,
                      SOS_token, EOS_token,
-                     n_layers=args.decoder_layer_size, rnn_cell='gru', embedding_size=args.embedding_size,
+                     n_layers=args.decoder_layer_size, rnn_cell='lstm', embedding_size=args.embedding_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=1, device=device)
 
     model = Seq2seq(enc, dec)
