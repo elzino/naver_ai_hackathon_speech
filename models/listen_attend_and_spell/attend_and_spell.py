@@ -68,7 +68,7 @@ class AttendSpellRNN(nn.Module):
     KEY_SEQUENCE = 'sequence'
 
     def __init__(self, vocab_size, max_len, hidden_size, sos_id, eos_id, n_layers=2, rnn_cell='gru',
-                 embedding_size=512, input_dropout_p=0, dropout_p=0, beam_width=1, device='cpu'):
+                 embedding_size=512, input_dropout_p=0, dropout_p=0, beam_width=1, context_to_softmax=True, device='cpu'):
         super().__init__()
 
         self.device = device
@@ -83,6 +83,7 @@ class AttendSpellRNN(nn.Module):
 
         self.n_layers = n_layers
         self.beam_width = beam_width
+        self.context_to_softmax = context_to_softmax
 
         if rnn_cell.lower() == 'lstm':
             self.rnn_cell = nn.LSTM
@@ -102,9 +103,16 @@ class AttendSpellRNN(nn.Module):
 
         self.input_dropout = nn.Dropout(p=input_dropout_p)
         self.attention = Attention(self.hidden_size)
-        self.out = nn.Linear(self.hidden_size, vocab_size)
 
-    def forward_step(self, input_var, last_bottom_hidden, last_upper_hidden, encoder_outputs, function):
+        out_hidden_size = self.hidden_size
+        self.forward_step = self.forward_step_original
+        if context_to_softmax:
+            out_hidden_size *= 2
+            self.forward_step = self.forward_step_context_to_softmax
+
+        self.out = nn.Linear(out_hidden_size, vocab_size)
+
+    def forward_step_original(self, input_var, last_bottom_hidden, last_upper_hidden, last_context, encoder_outputs, function):
         # input_var = [list of int] = [B]
         # last_~~~_hidden = [layer x B x hidden_size]
         # encoder_outputs = [B x max_len x hidden_dim]
@@ -124,7 +132,32 @@ class AttendSpellRNN(nn.Module):
         x, upper_hidden = self.upper_rnn(x, last_upper_hidden)  # B x 1 x H
         predicted_prob = function(self.out(x.squeeze(1)), dim=-1)  # B x vocab_size
 
-        return predicted_prob, bottom_hidden, upper_hidden, attn
+        return predicted_prob, bottom_hidden, upper_hidden, attn, context
+
+    def forward_step_context_to_softmax(self, input_var, last_bottom_hidden, last_upper_hidden, last_context, encoder_outputs, function):
+        # input_var = [list of int] = [B]
+        # last_~~~_hidden = [layer x B x hidden_size]
+        # encoder_outputs = [B x max_len x hidden_dim]
+
+        embedded = self.embedding(input_var)
+        embedded = self.input_dropout(embedded).unsqueeze(1)  # B x 1 x H
+
+        #  if self.training:
+        self.bottom_rnn.flatten_parameters()
+        self.upper_rnn.flatten_parameters()
+
+        x = torch.cat([embedded, last_context], 2)  # B x 1 x (2 * H)
+
+        x, bottom_hidden = self.bottom_rnn(x, last_bottom_hidden)
+
+        attn = self.attention(encoder_outputs, bottom_hidden)  # (batch, max_len)
+        context = attn.unsqueeze(1).bmm(encoder_outputs)  # B x 1 x H
+
+        x, upper_hidden = self.upper_rnn(x, last_upper_hidden)  # B x 1 x H
+        x = self.out(torch.cat([x, context], 2).squeeze(1))  # B x vocab_size
+        predicted_prob = function(x, dim=-1)  # B x vocab_size
+
+        return predicted_prob, bottom_hidden, upper_hidden, attn, context
 
     def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None, function=F.log_softmax, teacher_forcing_ratio=0):
         ret_dict = dict()
@@ -132,6 +165,7 @@ class AttendSpellRNN(nn.Module):
 
         inputs, batch_size, max_length = self._validate_args(inputs, encoder_outputs, teacher_forcing_ratio)
         bottom_hidden, upper_hidden = self._init_state_zero(batch_size)
+        last_context = self._init_context(batch_size)
 
         use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
 
@@ -158,14 +192,14 @@ class AttendSpellRNN(nn.Module):
         if use_teacher_forcing:
             decoder_input = inputs[:, :-1]
             for di in range(max_length):
-                decoder_output, bottom_hidden, upper_hidden, attn \
-                    = self.forward_step(decoder_input[:, di], bottom_hidden, upper_hidden, encoder_outputs, function)
+                decoder_output, bottom_hidden, upper_hidden, attn, last_context \
+                    = self.forward_step(decoder_input[:, di], bottom_hidden, upper_hidden, last_context, encoder_outputs, function)
                 decode(di, decoder_output, attn)
         else:
             decoder_input = inputs[:, 0]
             for di in range(max_length):
-                decoder_output, bottom_hidden, upper_hidden, step_attn \
-                    = self.forward_step(decoder_input, bottom_hidden, upper_hidden, encoder_outputs, function)
+                decoder_output, bottom_hidden, upper_hidden, step_attn, last_context \
+                    = self.forward_step(decoder_input, bottom_hidden, upper_hidden, last_context, encoder_outputs, function)
                 symbols = decode(di, decoder_output, step_attn)  # batch x 1
                 decoder_input = symbols.squeeze(1)
 
@@ -191,6 +225,10 @@ class AttendSpellRNN(nn.Module):
         bottom_init = torch.zeros(1, batch_size, self.hidden_size).to(self.device)
         upper_init = torch.zeros(self.n_layers - 1, batch_size, self.hidden_size).to(self.device)
         return bottom_init, upper_init
+
+    def _init_context(self, batch_size):
+        context = torch.zeros(batch_size, 1, self.hidden_size).to(self.device)
+        return context
 
     def _cat_directions(self, h):
         """
