@@ -54,7 +54,7 @@ class Seq2seq(nn.Module):
 
     """
 
-    def __init__(self, encoder, decoder, decode_function=F.log_softmax):
+    def __init__(self, encoder, decoder, decode_function=F.softmax):
         super(Seq2seq, self).__init__()
         self.encoder = encoder
         self.decoder = decoder

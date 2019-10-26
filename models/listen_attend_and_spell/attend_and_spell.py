@@ -126,7 +126,7 @@ class AttendSpellRNN(nn.Module):
 
         return predicted_prob, bottom_hidden, upper_hidden, attn
 
-    def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None, function=F.log_softmax, teacher_forcing_ratio=0):
+    def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None, function=F.softmax, teacher_forcing_ratio=0):
         ret_dict = dict()
         ret_dict[AttendSpellRNN.KEY_ATTN_SCORE] = list()
 
