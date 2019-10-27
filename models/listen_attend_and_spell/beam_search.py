@@ -101,7 +101,7 @@ class Beam(object):
         for i in range(self.next_ys[-1].size(0)):
             if self.next_ys[-1][i] == self._eos:
                 length = len(self.next_ys) - 1
-                score = self.scores[i]  # / pow(length, 0.3)
+                score = self.scores[i] / length
                 self.finished.append((score, length, i))
 
         # End condition is when top-of-beam is EOS and no global score.
