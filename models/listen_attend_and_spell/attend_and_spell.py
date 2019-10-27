@@ -187,7 +187,8 @@ class AttendSpellRNN(nn.Module):
         context = attn.unsqueeze(1).bmm(encoder_outputs)  # B x 1 x H
 
         x, upper_hidden = self.upper_rnn(x, last_upper_hidden)  # B x 1 x H
-        predicted_prob = function(self.out(x.squeeze(1)), dim=-1)  # B x vocab_size
+        x = self.out(torch.cat([x, context], 2).squeeze(1))  # B x vocab_size
+        predicted_prob = function(x, dim=-1)  # B x vocab_size
 
         return predicted_prob, bottom_hidden, upper_hidden, attn, context
 
