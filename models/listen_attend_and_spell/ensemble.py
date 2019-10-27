@@ -35,13 +35,19 @@ class Ensemble(nn.Module):
         self.models= models
         for model in self.models:
             model.eval()
+            for param in model.parameters():
+                param.requires_grad = False
         self.device = device
+        self.classifier = nn.Linear(vocab_size * len(models),vocab_size)
+    def flatten_parameters(self):
+       return 0
 
-    def forward(self, input_variable, input_lengths=None, target_variable=None, teacher_forcing_ratio=0):
-        x = torch.zeros(input_variable.size(0), self.max_len, self.vocab_size).to(self.device)
+    def forward(self, input_variable, input_lengths=None, target_variable=None, function=F.log_softmax, teacher_forcing_ratio=0):
+        results = []
         for model in self.models:
-            output = model(input_variable)
-            output = torch.stack(output, dim=1).to(self.device)
-            x += output
-        
+            output = model(input_variable, input_lengths, target_variable, teacher_forcing_ratio=teacher_forcing_ratio) # seq_len x (batch x vocab Tensor)
+            output = torch.stack(output, dim=1).to(self.device)  # batch x seq_len x vocab_size
+            results.append(output)
+        x = self.classifier(torch.cat(results, dim=2))
+        x = function(x, dim=-1)  # batch x length x vocab
         return x

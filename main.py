@@ -131,12 +131,9 @@ def train(model, total_batch_size, queue, criterion, optimizer, device, train_be
         target = scripts[:, 1:]
 
         model.module.flatten_parameters()
-        probability = model(feats, feat_lengths, scripts, teacher_forcing_ratio=teacher_forcing_ratio)
-        logit = torch.log(probability)
-        logit = torch.stack(logit, dim=1).to(device)  # batch x seq_len x vocab_size
-        
+        logit = model(feats, feat_lengths, scripts, teacher_forcing_ratio=teacher_forcing_ratio)
+        # logit = torch.stack(logit, dim=1).to(device)  # batch x seq_len x vocab_size
         y_hat = logit.max(-1)[1]
-
         loss = criterion(logit.contiguous().view(-1, logit.size(-1)), target.contiguous().view(-1))
         total_loss += loss.item()
         total_num += sum(feat_lengths)
@@ -201,9 +198,9 @@ def evaluate(model, dataloader, queue, criterion, device):
             target = scripts[:, 1:]
 
             model.module.flatten_parameters()
-            probability = model(feats, feat_lengths, scripts, teacher_forcing_ratio=0.0)
-            logit = torch.log(probability)
-            logit = torch.stack(logit, dim=1).to(device)  # batch x seq_len x vocab_size
+            logit = model(feats, feat_lengths, scripts, teacher_forcing_ratio=0.0)
+            # logit = torch.log(probability)
+            # logit = torch.stack(logit, dim=1).to(device)  # batch x seq_len x vocab_size
             y_hat = logit.max(-1)[1]
 
             loss = criterion(logit.contiguous().view(-1, logit.size(-1)), target.contiguous().view(-1))
@@ -325,6 +322,7 @@ def main():
     # N_FFT: defined in loader.py
     feature_size = MEL_FILTERS
     enc, dec = [], []
+
     # first ensemble element
     enc.append(ListenRNN(feature_size, args.hidden_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
@@ -337,15 +335,13 @@ def main():
     # second ensemble element
     enc.append(ListenRNN(feature_size, args.hidden_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout,
-                     n_layers=3, rnn_cell='gru'))
+                     n_layers=4, rnn_cell='gru'))
     dec.append(AttendSpellRNN(vocab_size, args.max_len, args.hidden_size * 2,
                      SOS_token, EOS_token,
                      n_layers=args.decoder_layer_size, rnn_cell='gru', embedding_size=args.embedding_size,
                      input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=1, device=device))
     models = []
-    optimizer = []
-    scheduler = []
-    criterion = []
+
     for index in range(len(enc)):
         models.append(Seq2seq(enc[index], dec[index]))
         models[index].flatten_parameters()
@@ -354,26 +350,29 @@ def main():
             param.data.uniform_(-0.1, 0.1)
 
         models[index] = nn.DataParallel(models[index]).to(device)
+        optimizer = optim.Adam(models[index].module.parameters(), lr=args.lr)
 
-        optimizer.append(optim.Adam(models[index].module.parameters(), lr=args.lr))
-        scheduler.append(optim.lr_scheduler.MultiStepLR(optimizer[index], milestones=[20, 35, 45], gamma=0.5))
-        criterion.append(LabelSmoothingLoss(vocab_size, ignore_index=PAD_token, smoothing=0.1, dim=-1))
 
-        bind_model(models[index], optimizer[index])
+        bind_model(models[index], optimizer)
         if index == 0:
             nsml.load(checkpoint='best0_046371283766131983', session='team39/sr-hack-2019-50000/33')
         elif index == 1:  
-            nsml.load(checkpoint='best0_04362819374052981', session='team39/sr-hack-2019-50000/31')
+            nsml.load(checkpoint='best0_046371283766131983', session='team39/sr-hack-2019-50000/33')
         
-
     
     ensemble_model = Ensemble(models, vocab_size, args.max_len, device = device)
-    bind_model(ensemble_model, optimizer[0])
+    ensemble_model = nn.DataParallel(ensemble_model).to(device)
+    optimizer = optim.Adam(ensemble_model.parameters(), lr=args.lr)
+
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35, 45], gamma=0.5)
+    criterion = LabelSmoothingLoss(vocab_size, ignore_index=PAD_token, smoothing=0.1, dim=-1)
+
+    bind_model(ensemble_model, optimizer)
     nsml.save('saved')
 
     if args.pause == 1:
         nsml.paused(scope=locals())
-    exit()
+
     if args.mode != "train":
         return
 
@@ -402,6 +401,9 @@ def main():
     logger.info('start')
 
     train_begin = time.time()
+    # for name, param in ensemble_model.module.named_parameters():
+    #     if param.requires_grad:
+    #         print (name, param.data)
 
     for epoch in range(begin_epoch, args.max_epochs):
         if epoch == begin_epoch:
@@ -413,7 +415,7 @@ def main():
         train_loader = MultiLoader(train_dataset_list, train_queue, args.batch_size, args.workers)
         train_loader.start()
 
-        train_loss, train_cer = train(model, train_batch_num, train_queue, criterion, optimizer, device, train_begin, args.workers, 10, args.teacher_forcing, epoch == begin_epoch, args.lr)
+        train_loss, train_cer = train(ensemble_model, train_batch_num, train_queue, criterion, optimizer, device, train_begin, args.workers, 10, args.teacher_forcing, epoch == begin_epoch, args.lr)
         logger.info('Epoch %d (Training) Loss %0.4f CER %0.4f' % (epoch, train_loss, train_cer))
 
         train_loader.join()
@@ -422,7 +424,7 @@ def main():
         valid_loader = BaseDataLoader(valid_dataset, valid_queue, args.batch_size, 0)
         valid_loader.start()
 
-        eval_loss, eval_cer = evaluate(model, valid_loader, valid_queue, criterion, device)
+        eval_loss, eval_cer = evaluate(ensemble_model, valid_loader, valid_queue, criterion, device)
         logger.info('Epoch %d (Evaluate) Loss %0.4f CER %0.4f' % (epoch, eval_loss, eval_cer))
 
         valid_loader.join()
