@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 
 class Attention(nn.Module):
-    def __init__(self, hidden_dim):
+    def __init__(self, encoder_hidden_dim, attention_hidden_dim=128):
         """
         Args
             hidden_dim: dimension of hidden unit in LSTM = numdirections * hidden_size
@@ -23,9 +23,9 @@ class Attention(nn.Module):
 
         """
         super().__init__()
-        self.Wa = nn.Linear(hidden_dim, hidden_dim, bias=False)
-        self.Ua = nn.Linear(hidden_dim, hidden_dim, bias=False)
-        self.Va = nn.Linear(hidden_dim, 1, bias=False)
+        self.Wa = nn.Linear(encoder_hidden_dim, attention_hidden_dim, bias=False)
+        self.Ua = nn.Linear(encoder_hidden_dim, attention_hidden_dim, bias=False)
+        self.Va = nn.Linear(attention_hidden_dim, 1, bias=False)
 
     def forward(self, encoder_outputs, last_hiddens, seq_lens=None):
         """
