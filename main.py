@@ -334,7 +334,7 @@ def main():
     dec = AttendSpellRNN(vocab_size, args.max_len, args.hidden_size * 2,
                      SOS_token, EOS_token,
                      n_layers=args.decoder_layer_size, rnn_cell='gru', embedding_size=args.embedding_size,
-                     input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=4, device=device)
+                     input_dropout_p=args.dropout, dropout_p=args.dropout, beam_width=16, device=device)
 
     model = Seq2seq(enc, dec)
     model.flatten_parameters()
