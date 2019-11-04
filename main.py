@@ -346,8 +346,7 @@ def main():
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 35, 45], gamma=0.5)
     criterion = LabelSmoothingLoss(vocab_size, ignore_index=PAD_token, smoothing=0.1, dim=-1)
     bind_model(model, optimizer)
-    nsml.load(checkpoint='best0_046371283766131983', session='team39/sr-hack-2019-50000/33')
-    nsml.save('saved')
+
     if args.pause == 1:
         nsml.paused(scope=locals())
 

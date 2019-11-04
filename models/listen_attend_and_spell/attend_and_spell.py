@@ -163,6 +163,7 @@ class AttendSpellRNN(nn.Module):
         ret_dict[AttendSpellRNN.PROBABILITY] = list()
 
         inputs, batch_size, max_length = self._validate_args(inputs, encoder_outputs, teacher_forcing_ratio)
+
         use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
 
         decoder_outputs = []
@@ -183,19 +184,29 @@ class AttendSpellRNN(nn.Module):
                 lengths[update_idx] = len(sequence_symbols)  # eos 처음 나타나는 곳에서 그 길이로 update
             return symbols
 
-        # Manual unrolling is used to support random teacher forcing.
-        # If teacher_forcing_ratio is True or False instead of a probability, the unrolling can be done in graph
-        if use_teacher_forcing:
+        if self.training:
             bottom_hidden, upper_hidden = self._init_state_zero(batch_size)
-            decoder_input = inputs[:, :-1]
-            for di in range(max_length):
-                decoder_output, bottom_hidden, upper_hidden, attn \
-                    = self.forward_step(decoder_input[:, di], bottom_hidden, upper_hidden, encoder_outputs, function)
-                decode(di, decoder_output, attn)
+
+            if use_teacher_forcing:
+                decoder_input = inputs[:, :-1]
+                for di in range(max_length):
+                    decoder_output, bottom_hidden, upper_hidden, attn \
+                        = self.forward_step(decoder_input[:, di], bottom_hidden, upper_hidden, encoder_outputs,
+                                            function)
+                    decode(di, decoder_output, attn)
+            else:
+                decoder_input = inputs[:, 0]
+                for di in range(max_length):
+                    decoder_output, bottom_hidden, upper_hidden, step_attn \
+                        = self.forward_step(decoder_input, bottom_hidden, upper_hidden, encoder_outputs, function)
+                    symbols = decode(di, decoder_output, step_attn)  # batch x 1
+                    decoder_input = symbols.squeeze(1)
+
             ret_dict[AttendSpellRNN.KEY_SEQUENCE] = sequence_symbols
             ret_dict[AttendSpellRNN.KEY_LENGTH] = lengths.tolist()
-            decoder_outputs_temp = torch.stack(decoder_outputs, dim=1).to(self.device)  # batch x seq_len x vocab_size
+            decoder_outputs_temp = torch.stack(decoder_outputs, dim=1)  # batch x seq_len x vocab_size
             hyps = decoder_outputs_temp.max(-1)[1]
+
         else:
             bottom_hidden, upper_hidden = self._init_state_zero_beam(batch_size, self.beam_width)
             beam = [
@@ -222,7 +233,7 @@ class AttendSpellRNN(nn.Module):
                 for j, b in enumerate(beam):
                     b.advance(decoder_output[j, :], step_attn.data[j, :, :])
                     select_indices_array.append(
-                            list(map(lambda x: x + j * self.beam_width, b.current_origin))
+                        list(map(lambda x: x + j * self.beam_width, b.current_origin))
                     )
                 select_indices = torch.tensor(select_indices_array, dtype=torch.int64).view(-1).to(self.device)
                 bottom_hidden, upper_hidden = self._select_indices_hidden(select_indices, bottom_hidden, upper_hidden)
@@ -233,7 +244,7 @@ class AttendSpellRNN(nn.Module):
                 hyp, beam_index, prob = b.get_hyp(times, k)
 
                 prob = torch.stack(prob)
-                prob = b.fill_empty_sequence(prob, max_length)      # make length max_length of sequence
+                prob = b.fill_empty_sequence(prob, max_length)  # make length max_length of sequence
                 hyp = torch.stack(hyp)
                 hyp = b.fill_empty_sequence(hyp, max_length)
 
