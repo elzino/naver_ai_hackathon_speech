@@ -81,7 +81,7 @@ class Beam(object):
         if len(self.prev_ks) > 0:
             beam_scores = word_probs + self.scores.unsqueeze(1)  # beam_width * words
             # Don't let EOS have children.
-            for i in range(self.next_ys[-1].size(0)):
+            for i in range(self.size):
                 if self.next_ys[-1][i] == self._eos:
                     beam_scores[i] = -1e20
         else:
@@ -98,7 +98,7 @@ class Beam(object):
         self.prev_ks.append(prev_k)
         self.next_ys.append((best_scores_id - prev_k * num_words))
 
-        for i in range(self.next_ys[-1].size(0)):
+        for i in range(self.size):
             if self.next_ys[-1][i] == self._eos:
                 length = len(self.next_ys) - 1
                 score = self.scores[i] / length
@@ -109,6 +109,12 @@ class Beam(object):
             self.all_scores.append(self.scores)
 
     def sort_finished(self):
+        if len(self.finished) == 0:
+            for i in range(self.size):
+                length = len(self.next_ys) - 1
+                score = self.scores[i] / length
+                self.finished.append((score, length, i))
+
         self.finished = sorted(self.finished, key=lambda finished: finished[0], reverse=True)
         scores = [sc for sc, _, _ in self.finished]
         ks = [(t, k) for _, t, k in self.finished]
