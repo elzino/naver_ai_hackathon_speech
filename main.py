@@ -339,9 +339,6 @@ def main():
     model = Seq2seq(enc, dec)
     model.flatten_parameters()
 
-    for param in model.parameters():
-        param.data.uniform_(-0.1, 0.1)
-
     model = nn.DataParallel(model).to(device)
 
     optimizer = optim.Adam(model.module.parameters(), lr=args.lr)
