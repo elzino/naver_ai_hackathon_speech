@@ -110,7 +110,7 @@ class Beam(object):
 
     def sort_finished(self):
         if len(self.finished) == 0:
-            for i in range(self.size):
+            for i in range(self.n_best):
                 length = len(self.next_ys) - 1
                 score = self.scores[i] / length
                 self.finished.append((score, length, i))

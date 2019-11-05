@@ -1,0 +1,3 @@
+python-Levenshtein
+torchaudio -f https://download.pytorch.org/whl/torch_stable.html
+git+https://github.com/n-CLAIR/nsml-local
