@@ -1,9 +1,9 @@
 # NAVER AI HACKATHON 2019 - Speech To Text
-We participated in [NAVER_AI_HACKTHON 2019](https://github.com/Naver-AI-Hackathon/AI-Speech) and ranked 9th(76.9) as a two-man team(Hangbok Coding).
+We participated in [NAVER_AI_HACKTHON 2019](https://github.com/Naver-AI-Hackathon/AI-Speech) and ranked 9th(77.0155) as a two-man team(Hangbok Coding).
 * 박승일(Seungil Park) [github repo](https://psi9730.github.io/)
-* 이진호(Jinho Lee) [github repo](https://github.com/elzino)
+* 이진호(Jinho Lee)    [github repo](https://github.com/elzino)
 
-Final Leaderboard
+## Final Leaderboard
 ![finale-leader-board](docs/final-board.png)
 
 ## Features
@@ -18,8 +18,10 @@ Final Leaderboard
 
 ### Docker
 ```bash
-$docker build -t model:0.0 .
-$docker run -i -t --name model model:0.0
+$ docker build -t model:0.0 .
+$ docker run -i -t --name model model:0.0
+```
+
 ### NSML
 Login with nsml first, and run commands as follows:
 ```bash
