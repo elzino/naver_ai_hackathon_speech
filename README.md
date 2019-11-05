@@ -13,13 +13,15 @@ We participated in [NAVER_AI_HACKTHON 2019](https://github.com/Naver-AI-Hackatho
 * labelsmoothing
 * Multi step learning rate
 * ensemble (but not used for best model)
-
+* data preprocessing (delete blank and special characters)
 ## How to RUN
 
 ### Docker
 ```bash
 $ docker build -t model:0.0 .
-$ docker run -i -t --name model model:0.0
+$ docker run -i --name model model:0.0
+$ docker exec -i -t model /bin/bash
+$ ./run.sh
 ```
 
 ### NSML
@@ -27,7 +29,7 @@ Login with nsml first, and run commands as follows:
 ```bash
 $ ./run.sh # for local training
 $ ./run_nsml.sh  # for NSML training
-$ nsml submit -t (sessionName) (checkpoint) # for submit
+$ nsml submit (sessionName) (checkpoint) # for submit
 ```
 
 ## Hyperparameters

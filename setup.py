@@ -6,7 +6,7 @@ setup(
     name='speech_hackathon',
     version='1.0',
     install_requires=[
-        'python-Levenshtein',
+        'python-Levenshtein==0.12.0',
         'librosa==0.7.0'
     ]
 )

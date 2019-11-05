@@ -1,3 +1,2 @@
-python-Levenshtein
-torchaudio -f https://download.pytorch.org/whl/torch_stable.html
-git+https://github.com/n-CLAIR/nsml-local
+python-Levenshtein==0.12.0
+librosa==0.6.3
