@@ -18,7 +18,7 @@ We participated in [NAVER_AI_HACKTHON 2019](https://github.com/Naver-AI-Hackatho
 
 ## Data
 Naver has released approximately 100 hours of 16kHz Korean speech data. <br/>
-[data part 1](https://drive.google.com/open?id=1UOspFSTJ2w0wsENIeD6Ilcy5dd4NTsDV) / [data part 2](https://drive.google.com/open?id=1Bh0vodkng3_SF7lLa82KePv6S7jzYEQV) <br/>
+* Download links : [data part 1](https://drive.google.com/open?id=1UOspFSTJ2w0wsENIeD6Ilcy5dd4NTsDV) / [data part 2](https://drive.google.com/open?id=1Bh0vodkng3_SF7lLa82KePv6S7jzYEQV) <br/>
 
 ### Data format
 * Audio data : 16bit, mono 16k sampling PCM, WAV audio
@@ -87,6 +87,7 @@ $ nsml submit (sessionName) (checkpoint) # for submit
 1. [Listen, Attend and Spell](https://arxiv.org/abs/1508.01211)
 2. [Label Smoothing](https://arxiv.org/abs/1906.02629)
 3. [SpecAugment](https://arxiv.org/abs/1904.08779)
+4. [Naver's baseline code](https://github.com/clovaai/speech_hackathon_2019)
 
 ## License
 Copyright 2019 Hangbok Coding.
