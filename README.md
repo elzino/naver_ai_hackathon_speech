@@ -8,7 +8,7 @@ We participated in [NAVER_AI_HACKTHON 2019](https://github.com/Naver-AI-Hackatho
 
 ## Features
 * Convolution feature extraction (deepspeech style)
-* Seq2Seq (bidirectional GRU encoder, unidirectional GRU encoder with Bahdanau Attention)
+* Seq2Seq (bidirectional GRU encoder, unidirectional GRU decoder with Bahdanau Attention)
 * Augmentation with log mel spectrogram (SpecAugment)
 * Beam-search
 * Data preprocessing (deleted blank and special characters)
