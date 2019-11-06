@@ -7,8 +7,8 @@ We participated in [NAVER_AI_HACKTHON 2019](https://github.com/Naver-AI-Hackatho
 ![finale-leader-board](docs/final-board.png)
 
 ## Features
-* Convolution feature extraction(deepspeech style)
-* Seq2Seq(bidirectional GRU encoder, unidirectional GRU encoder with Bahdanau Attention)
+* Convolution feature extraction (deepspeech style)
+* Seq2Seq (bidirectional GRU encoder, unidirectional GRU encoder with Bahdanau Attention)
 * Augmentation with log mel spectrogram (SpecAugment)
 * Beam-search
 * Data preprocessing (deleted blank and special characters)
@@ -22,7 +22,7 @@ Naver has released approximately 100 hours of 16kHz Korean speech data. <br/>
 
 ### Data format
 * Audio data : 16bit, mono 16k sampling PCM, WAV audio
-* Target script : Korean characters are converted to the index according to the 'hackathon.labels' file
+* Target script : Korean characters are converted to the indices according to the 'hackathon.labels' file
   ```js
   "네 괜찮습니다." => "715 662 127 76 396 337 669 662"
   ```
@@ -41,7 +41,6 @@ Naver has released approximately 100 hours of 16kHz Korean speech data. <br/>
   ```
   <wav-filename>,<script-filename>
   wav_001.wav,wav_001.label
-  wav_002.wav,wav_002.label
   ...
   ```
 
@@ -49,7 +48,6 @@ Naver has released approximately 100 hours of 16kHz Korean speech data. <br/>
   ```
   <filename>,<script labels>
   wav_001,628 9 625 662 408 690 2 125 71 662 220 630 610 749 62 661 123 662
-  wav_002,384 638 610 533 784 662 130 602 662 179 192 661 123 662  
   ...
   ```
 
