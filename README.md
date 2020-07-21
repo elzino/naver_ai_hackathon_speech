@@ -1,7 +1,7 @@
 # NAVER AI HACKATHON 2019 - Speech To Text
 We participated in [NAVER_AI_HACKTHON 2019](https://github.com/Naver-AI-Hackathon/AI-Speech) and ranked 9th(77.0155) as a two-man team(Hangbok Coding, 행복코딩).
-* 박승일(Seungil Park) [github repo](https://psi9730.github.io/)
-* 이진호(Jinho Lee)    [github repo](https://github.com/elzino)
+* 이진호(Jinho Lee)    [github profile](https://github.com/elzino)
+* 박승일(Seungil Park) [github profile](https://github.com/psi9730)
 
 ## Final Leaderboard
 ![finale-leader-board](docs/final-board.png)
